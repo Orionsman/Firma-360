@@ -14,6 +14,8 @@ export default function RootLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="privacy-policy" />
+        <Stack.Screen name="account-deletion" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />

@@ -33,6 +33,7 @@ interface AuthContextType {
     companyName: string
   ) => Promise<SignUpResult>;
   createCompanyProfile: (companyName: string) => Promise<void>;
+  requestAccountDeletion: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshCompany: () => Promise<void>;
 }
@@ -205,6 +206,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const requestAccountDeletion = async (reason?: string) => {
+    const { error } = await supabase.rpc('request_account_deletion', {
+      request_reason: reason?.trim() || null,
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+  };
+
   const refreshCompany = async () => {
     if (user) {
       await fetchCompany(user.id);
@@ -221,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signUp,
         createCompanyProfile,
+        requestAccountDeletion,
         signOut,
         refreshCompany,
       }}

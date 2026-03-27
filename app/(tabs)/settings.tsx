@@ -9,12 +9,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Info, KeyRound, LogOut, Save, Building2 } from 'lucide-react-native';
+import {
+  Building2,
+  FileLock2,
+  Info,
+  KeyRound,
+  LogOut,
+  Save,
+  Trash2,
+} from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export default function SettingsScreen() {
-  const { company, signOut, refreshCompany } = useAuth();
+  const { company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
@@ -22,8 +30,10 @@ export default function SettingsScreen() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [deletionReason, setDeletionReason] = useState('');
   const [savingCompany, setSavingCompany] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
 
   useEffect(() => {
     setCompanyName(company?.name || '');
@@ -106,9 +116,51 @@ export default function SettingsScreen() {
     try {
       await signOut();
       router.replace('/login');
-    } catch (error) {
-      console.error('Sign out error:', error);
+    } catch (error: unknown) {
+      Alert.alert(
+        'Hata',
+        error instanceof Error ? error.message : 'Cikis yapilamadi.'
+      );
     }
+  };
+
+  const handleRequestAccountDeletion = () => {
+    Alert.alert(
+      'Hesap silme talebi olusturulsun mu?',
+      'Bu islem silme surecini baslatir ve uygulamadan cikis yapmaniza neden olur.',
+      [
+        {
+          text: 'Vazgec',
+          style: 'cancel',
+        },
+        {
+          text: 'Talep Olustur',
+          style: 'destructive',
+          onPress: async () => {
+            setRequestingDeletion(true);
+            try {
+              await requestAccountDeletion(deletionReason);
+              await signOut();
+              setDeletionReason('');
+              Alert.alert(
+                'Talep Alindi',
+                'Hesap silme talebiniz kaydedildi. Gerekli durumlarda yasal saklama yukumlulukleri disindaki verileriniz silinecek veya anonimlestirilecektir.'
+              );
+              router.replace('/login');
+            } catch (error: unknown) {
+              Alert.alert(
+                'Hata',
+                error instanceof Error
+                  ? error.message
+                  : 'Hesap silme talebi olusturulamadi.'
+              );
+            } finally {
+              setRequestingDeletion(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -212,6 +264,61 @@ export default function SettingsScreen() {
           icin gelistirildi. Isletme operasyonlarini daha duzenli takip etmenize
           yardimci olur.
         </Text>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => router.push('/privacy-policy' as never)}
+        >
+          <Text style={styles.secondaryButtonText}>Gizlilik Politikasini Ac</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.secondaryButton, styles.secondaryButtonSpacing]}
+          onPress={() => router.push('/account-deletion' as never)}
+        >
+          <Text style={styles.secondaryButtonText}>Hesap Silme Bilgilerini Ac</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.dangerCard}>
+        <View style={styles.cardHeader}>
+          <Trash2 size={20} color="#dc2626" />
+          <Text style={styles.dangerCardTitle}>Hesap Silme</Text>
+        </View>
+
+        <Text style={styles.dangerText}>
+          Hesap silme talebi olusturdugunuzda silme sureci baslatilir. Yasal
+          yukumluluk nedeniyle saklanmasi gereken kayitlar haricindeki veriler
+          silinir veya anonimlestirilir.
+        </Text>
+
+        <Text style={styles.label}>Silme Nedeni (Opsiyonel)</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          value={deletionReason}
+          onChangeText={setDeletionReason}
+          multiline
+          numberOfLines={4}
+          placeholder="Talebinizle ilgili kisa bir not yazabilirsiniz."
+        />
+
+        <View style={styles.inlineInfo}>
+          <FileLock2 size={16} color="#991b1b" />
+          <Text style={styles.inlineInfoText}>
+            Bu islem talep olusturur ve sizi guvenlik amaciyla oturumdan cikarir.
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.dangerButton, requestingDeletion && styles.buttonDisabled]}
+          onPress={handleRequestAccountDeletion}
+          disabled={requestingDeletion}
+        >
+          <Trash2 size={18} color="#ffffff" />
+          <Text style={styles.dangerButtonText}>
+            {requestingDeletion ? 'Talep Gonderiliyor...' : 'Hesap Silme Talebi Olustur'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
@@ -319,10 +426,60 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  secondaryButtonSpacing: {
+    marginTop: 10,
+  },
   aboutText: {
     fontSize: 14,
     lineHeight: 22,
     color: '#475569',
+    marginBottom: 16,
+  },
+  dangerCard: {
+    backgroundColor: '#fff1f2',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#fecdd3',
+    marginBottom: 16,
+  },
+  dangerCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#7f1d1d',
+  },
+  dangerText: {
+    fontSize: 14,
+    lineHeight: 22,
+    color: '#7f1d1d',
+    marginBottom: 12,
+  },
+  inlineInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  inlineInfoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#991b1b',
+  },
+  dangerButton: {
+    marginTop: 18,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  dangerButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   logoutButton: {
     marginTop: 8,
