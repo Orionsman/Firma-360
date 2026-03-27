@@ -34,6 +34,7 @@ interface AuthContextType {
   ) => Promise<SignUpResult>;
   createCompanyProfile: (companyName: string) => Promise<void>;
   requestAccountDeletion: (reason?: string) => Promise<void>;
+  deleteAccount: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshCompany: () => Promise<void>;
 }
@@ -42,7 +43,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getReadableAuthError = (error: unknown) => {
   const message =
-    error instanceof Error ? error.message : 'Beklenmeyen bir hata olustu.';
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof (error as { message?: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : 'Beklenmeyen bir hata olustu.';
   const lowered = message.toLowerCase();
 
   if (lowered.includes('email rate limit exceeded')) {
@@ -65,6 +73,13 @@ const getReadableAuthError = (error: unknown) => {
     lowered.includes('403')
   ) {
     return 'Supabase yetki ayari nedeniyle islem tamamlanamadi. SQL policy ayarlari duzeltilmeli veya kullaniciya SQL Editor uzerinden firma baglanmali.';
+  }
+
+  if (
+    lowered.includes('schema cache') ||
+    lowered.includes('function') && lowered.includes('not found')
+  ) {
+    return 'Supabase fonksiyonu bulunamadi. Migration SQL dosyalari veritabanina uygulanmamis olabilir.';
   }
 
   return message;
@@ -216,6 +231,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const deleteAccount = async (reason?: string) => {
+    const { error } = await supabase.functions.invoke('delete-account', {
+      body: {
+        reason: reason?.trim() || null,
+      },
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+  };
+
   const refreshCompany = async () => {
     if (user) {
       await fetchCompany(user.id);
@@ -233,6 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         createCompanyProfile,
         requestAccountDeletion,
+        deleteAccount,
         signOut,
         refreshCompany,
       }}

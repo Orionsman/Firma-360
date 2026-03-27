@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Plus, X, ShoppingCart, Check, Trash2 } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -141,6 +142,12 @@ export default function Sales() {
     fetchCustomers();
     fetchProducts();
   }, [company]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void Promise.all([fetchSales(), fetchCustomers(), fetchProducts()]);
+    }, [company])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -308,27 +315,6 @@ export default function Sales() {
         }
       }
 
-      const { data: customerData, error: customerFetchError } = await supabase
-        .from('customers')
-        .select('balance')
-        .eq('id', selectedCustomer)
-        .maybeSingle();
-
-      if (customerFetchError) {
-        throw customerFetchError;
-      }
-
-      const { error: customerUpdateError } = await supabase
-        .from('customers')
-        .update({
-          balance: Number(customerData?.balance || 0) + totalAmount,
-        })
-        .eq('id', selectedCustomer);
-
-      if (customerUpdateError) {
-        throw customerUpdateError;
-      }
-
       setSelectedCustomer('');
       setSaleItems([]);
       setModalVisible(false);
@@ -378,31 +364,6 @@ export default function Sales() {
 
       if (movementDeleteError) {
         throw movementDeleteError;
-      }
-
-      if (sale.customer_id) {
-        const { data: customerData, error: customerFetchError } = await supabase
-          .from('customers')
-          .select('balance')
-          .eq('id', sale.customer_id)
-          .maybeSingle();
-
-        if (customerFetchError) {
-          throw customerFetchError;
-        }
-
-        const { error: customerUpdateError } = await supabase
-          .from('customers')
-          .update({
-            balance:
-              Number(customerData?.balance || 0) -
-              Number(sale.total_amount || 0),
-          })
-          .eq('id', sale.customer_id);
-
-        if (customerUpdateError) {
-          throw customerUpdateError;
-        }
       }
 
       const { error: saleDeleteError } = await supabase

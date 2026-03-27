@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   Trash2,
 } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
@@ -131,116 +132,27 @@ export default function Payments() {
     fetchSuppliers();
   }, [company]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void Promise.all([fetchPayments(), fetchCustomers(), fetchSuppliers()]);
+    }, [company])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchPayments();
     setRefreshing(false);
   };
 
-  const adjustBalanceForNewPayment = async (payment: {
-    amount: number;
-    customerId?: string | null;
-    supplierId?: string | null;
-    paymentType: 'income' | 'expense';
-  }) => {
-    if (payment.paymentType === 'income' && payment.customerId) {
-      const { data: customerData, error: customerFetchError } = await supabase
-        .from('customers')
-        .select('balance')
-        .eq('id', payment.customerId)
-        .maybeSingle();
-
-      if (customerFetchError) {
-        throw customerFetchError;
-      }
-
-      const { error: customerUpdateError } = await supabase
-        .from('customers')
-        .update({
-          balance: Number(customerData?.balance || 0) - payment.amount,
-        })
-        .eq('id', payment.customerId);
-
-      if (customerUpdateError) {
-        throw customerUpdateError;
-      }
-    }
-
-    if (payment.paymentType === 'expense' && payment.supplierId) {
-      const { data: supplierData, error: supplierFetchError } = await supabase
-        .from('suppliers')
-        .select('balance')
-        .eq('id', payment.supplierId)
-        .maybeSingle();
-
-      if (supplierFetchError) {
-        throw supplierFetchError;
-      }
-
-      const { error: supplierUpdateError } = await supabase
-        .from('suppliers')
-        .update({
-          balance: Number(supplierData?.balance || 0) - payment.amount,
-        })
-        .eq('id', payment.supplierId);
-
-      if (supplierUpdateError) {
-        throw supplierUpdateError;
-      }
-    }
-  };
-
-  const revertBalanceForDeletedPayment = async (payment: Payment) => {
-    if (payment.payment_type === 'income' && payment.customer_id) {
-      const { data: customerData, error: customerFetchError } = await supabase
-        .from('customers')
-        .select('balance')
-        .eq('id', payment.customer_id)
-        .maybeSingle();
-
-      if (customerFetchError) {
-        throw customerFetchError;
-      }
-
-      const { error: customerUpdateError } = await supabase
-        .from('customers')
-        .update({
-          balance: Number(customerData?.balance || 0) + Number(payment.amount),
-        })
-        .eq('id', payment.customer_id);
-
-      if (customerUpdateError) {
-        throw customerUpdateError;
-      }
-    }
-
-    if (payment.payment_type === 'expense' && payment.supplier_id) {
-      const { data: supplierData, error: supplierFetchError } = await supabase
-        .from('suppliers')
-        .select('balance')
-        .eq('id', payment.supplier_id)
-        .maybeSingle();
-
-      if (supplierFetchError) {
-        throw supplierFetchError;
-      }
-
-      const { error: supplierUpdateError } = await supabase
-        .from('suppliers')
-        .update({
-          balance: Number(supplierData?.balance || 0) + Number(payment.amount),
-        })
-        .eq('id', payment.supplier_id);
-
-      if (supplierUpdateError) {
-        throw supplierUpdateError;
-      }
-    }
-  };
-
   const handleAddPayment = async () => {
     if (!formData.amount.trim()) {
       Alert.alert('Hata', 'Lutfen tutar girin.');
+      return;
+    }
+
+    const parsedAmount = parseFloat(formData.amount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert('Hata', 'Gecerli bir tutar girin.');
       return;
     }
 
@@ -250,7 +162,6 @@ export default function Payments() {
 
     setSaving(true);
     try {
-      const parsedAmount = parseFloat(formData.amount);
       const { error } = await supabase.from('payments').insert({
         company_id: company!.id,
         customer_id:
@@ -271,13 +182,6 @@ export default function Payments() {
       if (error) {
         throw error;
       }
-
-      await adjustBalanceForNewPayment({
-        amount: parsedAmount,
-        customerId: activeTab === 'income' ? formData.relatedPartyId : null,
-        supplierId: activeTab === 'expense' ? formData.relatedPartyId : null,
-        paymentType: activeTab,
-      });
 
       setFormData({
         amount: '',
@@ -305,8 +209,6 @@ export default function Payments() {
 
     try {
       setDeletingId(payment.id);
-      await revertBalanceForDeletedPayment(payment);
-
       const { error } = await supabase
         .from('payments')
         .delete()

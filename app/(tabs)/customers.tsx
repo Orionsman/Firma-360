@@ -231,14 +231,12 @@ export default function Customers() {
   };
 
   useEffect(() => {
-    fetchCustomers();
-    fetchSuppliers();
+    void Promise.all([fetchCustomers(), fetchSuppliers()]);
   }, [company]);
 
   useFocusEffect(
     useCallback(() => {
-      void fetchCustomers();
-      void fetchSuppliers();
+      void Promise.all([fetchCustomers(), fetchSuppliers()]);
     }, [company])
   );
 
@@ -415,7 +413,7 @@ export default function Customers() {
 
     const isCustomer = activeTab === 'customers';
     const balance = Number(record.balance || 0);
-    if (isCustomer && balance !== 0) {
+    if (balance !== 0) {
       Alert.alert(
         'Silme engellendi',
         'Bakiyesi olan bir cari silinemez.'

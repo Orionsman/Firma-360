@@ -26,7 +26,7 @@ export default function Login() {
     setInfoMessage('');
 
     if (!email || !password) {
-      setErrorMessage('Lütfen tüm alanları doldurun.');
+      setErrorMessage('Lutfen tum alanlari doldurun.');
       return;
     }
 
@@ -36,7 +36,7 @@ export default function Login() {
       router.replace('/(tabs)');
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Giriş sırasında bir hata oluştu.'
+        error instanceof Error ? error.message : 'Giris sirasinda bir hata olustu.'
       );
     } finally {
       setLoading(false);

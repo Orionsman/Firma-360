@@ -22,7 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export default function SettingsScreen() {
-  const { company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
+  const { company, signOut, refreshCompany, deleteAccount } = useAuth();
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
@@ -126,33 +126,37 @@ export default function SettingsScreen() {
 
   const handleRequestAccountDeletion = () => {
     Alert.alert(
-      'Hesap silme talebi olusturulsun mu?',
-      'Bu islem silme surecini baslatir ve uygulamadan cikis yapmaniza neden olur.',
+      'Hesap kalici olarak silinsin mi?',
+      'Bu islem hesabinizi ve bagli firma verilerinizi kalici olarak siler. Islem geri alinamaz.',
       [
         {
           text: 'Vazgec',
           style: 'cancel',
         },
         {
-          text: 'Talep Olustur',
+          text: 'Hesabi Sil',
           style: 'destructive',
           onPress: async () => {
             setRequestingDeletion(true);
             try {
-              await requestAccountDeletion(deletionReason);
-              await signOut();
+              await deleteAccount(deletionReason);
               setDeletionReason('');
               Alert.alert(
-                'Talep Alindi',
-                'Hesap silme talebiniz kaydedildi. Gerekli durumlarda yasal saklama yukumlulukleri disindaki verileriniz silinecek veya anonimlestirilecektir.'
+                'Hesap Silindi',
+                'Hesabiniz ve bagli verileriniz silindi.'
               );
+              try {
+                await signOut();
+              } catch {
+                // Talep olustuktan sonra cikis hatasi basari durumunu bozmamali.
+              }
               router.replace('/login');
             } catch (error: unknown) {
               Alert.alert(
                 'Hata',
                 error instanceof Error
                   ? error.message
-                  : 'Hesap silme talebi olusturulamadi.'
+                  : 'Hesap silinemedi.'
               );
             } finally {
               setRequestingDeletion(false);
@@ -287,9 +291,8 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.dangerText}>
-          Hesap silme talebi olusturdugunuzda silme sureci baslatilir. Yasal
-          yukumluluk nedeniyle saklanmasi gereken kayitlar haricindeki veriler
-          silinir veya anonimlestirilir.
+          Devam ettiginizde hesap ve bagli firma verileriniz kalici olarak
+          silinir. Bu islem geri alinamaz.
         </Text>
 
         <Text style={styles.label}>Silme Nedeni (Opsiyonel)</Text>
@@ -305,7 +308,7 @@ export default function SettingsScreen() {
         <View style={styles.inlineInfo}>
           <FileLock2 size={16} color="#991b1b" />
           <Text style={styles.inlineInfoText}>
-            Bu islem talep olusturur ve sizi guvenlik amaciyla oturumdan cikarir.
+            Silme tamamlandiginda hesabiniza tekrar giris yapamazsiniz.
           </Text>
         </View>
 
@@ -316,7 +319,7 @@ export default function SettingsScreen() {
         >
           <Trash2 size={18} color="#ffffff" />
           <Text style={styles.dangerButtonText}>
-            {requestingDeletion ? 'Talep Gonderiliyor...' : 'Hesap Silme Talebi Olustur'}
+            {requestingDeletion ? 'Hesap Siliniyor...' : 'Hesabi Kalici Olarak Sil'}
           </Text>
         </TouchableOpacity>
       </View>

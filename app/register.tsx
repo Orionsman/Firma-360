@@ -27,7 +27,7 @@ export default function Register() {
     setSuccessMessage('');
 
     if (!email || !password || !companyName) {
-      setErrorMessage('Lütfen tüm alanları doldurun.');
+      setErrorMessage('Lutfen tum alanlari doldurun.');
       return;
     }
 
