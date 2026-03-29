@@ -22,6 +22,7 @@ import {
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAppTheme } from '@/contexts/ThemeContext';
 
 interface Payment {
   id: string;
@@ -48,6 +49,7 @@ interface Supplier {
 
 export default function Payments() {
   const { company } = useAuth();
+  const { theme } = useAppTheme();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -70,7 +72,7 @@ export default function Payments() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadan firma olusturmaniz gerekiyor.'
+        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
       );
       return false;
     }
@@ -262,32 +264,41 @@ export default function Payments() {
   };
 
   const renderPayment = ({ item }: { item: Payment }) => (
-    <View style={styles.listItem}>
+    <View
+      style={[
+        styles.listItem,
+        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+      ]}
+    >
       <View
         style={[
           styles.iconCircle,
           {
             backgroundColor:
-              item.payment_type === 'income' ? '#dcfce7' : '#fee2e2',
+              item.payment_type === 'income'
+                ? theme.colors.primarySoft
+                : theme.colors.dangerSoft,
           },
         ]}
       >
         {item.payment_type === 'income' ? (
-          <ArrowDownLeft size={24} color="#22c55e" />
+          <ArrowDownLeft size={24} color={theme.colors.success} />
         ) : (
-          <ArrowUpRight size={24} color="#ef4444" />
+          <ArrowUpRight size={24} color={theme.colors.danger} />
         )}
       </View>
 
       <View style={styles.itemContent}>
-        <Text style={styles.itemTitle}>{getRelatedParty(item)}</Text>
-        <Text style={styles.itemDetail}>
+        <Text style={[styles.itemTitle, { color: theme.colors.text }]}>{getRelatedParty(item)}</Text>
+        <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>
           {getPaymentMethodText(item.payment_method)}
         </Text>
         {item.description ? (
-          <Text style={styles.itemDescription}>{item.description}</Text>
+          <Text style={[styles.itemDescription, { color: theme.colors.textSoft }]}>
+            {item.description}
+          </Text>
         ) : null}
-        <Text style={styles.itemDate}>
+        <Text style={[styles.itemDate, { color: theme.colors.textSoft }]}>
           {new Date(item.payment_date).toLocaleDateString('tr-TR')}
         </Text>
       </View>
@@ -318,9 +329,9 @@ export default function Payments() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Odemeler</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Odemeler</Text>
         <TouchableOpacity
           onPress={() => {
             if (!ensureCompany()) {
@@ -328,44 +339,34 @@ export default function Payments() {
             }
             setModalVisible(true);
           }}
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
         >
           <Plus size={24} color="#ffffff" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'income' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'income' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
           onPress={() => setActiveTab('income')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'income' && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'income' ? theme.colors.primary : theme.colors.textMuted }]}>
             Gelir
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'expense' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'expense' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
           onPress={() => setActiveTab('expense')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'expense' && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'expense' ? theme.colors.primary : theme.colors.textMuted }]}>
             Gider
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.summaryCard}>
+      <View style={[styles.summaryCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>
+          <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>
             Toplam {activeTab === 'income' ? 'Gelir' : 'Gider'}
           </Text>
           <Text
@@ -389,8 +390,8 @@ export default function Payments() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Wallet size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>
+            <Wallet size={48} color={theme.colors.textSoft} />
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
               Henuz {activeTab === 'income' ? 'gelir' : 'gider'} yok
             </Text>
           </View>
@@ -399,22 +400,30 @@ export default function Payments() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 Yeni {activeTab === 'income' ? 'Gelir' : 'Gider'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Tutar *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Tutar *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="0.00"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.amount}
                   onChangeText={(text) => setFormData({ ...formData, amount: text })}
                   keyboardType="decimal-pad"
@@ -422,10 +431,18 @@ export default function Payments() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Tarih</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Tarih</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="YYYY-MM-DD"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.paymentDate}
                   onChangeText={(text) =>
                     setFormData({ ...formData, paymentDate: text })
@@ -434,12 +451,18 @@ export default function Payments() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Odeme Yontemi</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Odeme Yontemi</Text>
                 <TouchableOpacity
-                  style={styles.pickerButton}
+                  style={[
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
                   onPress={() => setShowMethodPicker(true)}
                 >
-                  <Text style={styles.pickerValue}>
+                  <Text style={[styles.pickerValue, { color: theme.colors.text }]}>
                     {getPaymentMethodText(formData.paymentMethod)}
                   </Text>
                 </TouchableOpacity>
@@ -447,14 +470,20 @@ export default function Payments() {
 
               {relatedParties.length > 0 ? (
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>
                     {activeTab === 'income' ? 'Musteri' : 'Tedarikci'}
                   </Text>
                   <TouchableOpacity
-                    style={styles.pickerButton}
+                    style={[
+                      styles.pickerButton,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
                     onPress={() => setShowPartyPicker(true)}
                   >
-                    <Text style={styles.pickerValue}>
+                    <Text style={[styles.pickerValue, { color: theme.colors.text }]}>
                       {formData.relatedPartyId
                         ? relatedParties.find(
                             (party) => party.id === formData.relatedPartyId
@@ -466,10 +495,19 @@ export default function Payments() {
               ) : null}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Aciklama</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Aciklama</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[
+                    styles.input,
+                    styles.textArea,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="Aciklama"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.description}
                   onChangeText={(text) =>
                     setFormData({ ...formData, description: text })
@@ -480,7 +518,11 @@ export default function Payments() {
               </View>
 
               <TouchableOpacity
-                style={[styles.submitButton, saving && styles.buttonDisabled]}
+                style={[
+                  styles.submitButton,
+                  { backgroundColor: theme.colors.primary },
+                  saving && styles.buttonDisabled,
+                ]}
                 onPress={handleAddPayment}
                 disabled={saving}
               >
@@ -495,11 +537,11 @@ export default function Payments() {
 
       <Modal visible={showMethodPicker} animationType="slide" transparent>
         <View style={styles.pickerModal}>
-          <View style={styles.pickerContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Odeme yontemi secin</Text>
+          <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Odeme yontemi secin</Text>
               <TouchableOpacity onPress={() => setShowMethodPicker(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -511,13 +553,15 @@ export default function Payments() {
               ].map((method) => (
                 <TouchableOpacity
                   key={method.value}
-                  style={styles.pickerItem}
+                  style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                   onPress={() => {
                     setFormData({ ...formData, paymentMethod: method.value });
                     setShowMethodPicker(false);
                   }}
                 >
-                  <Text style={styles.pickerItemText}>{method.label}</Text>
+                  <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
+                    {method.label}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -527,35 +571,37 @@ export default function Payments() {
 
       <Modal visible={showPartyPicker} animationType="slide" transparent>
         <View style={styles.pickerModal}>
-          <View style={styles.pickerContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+          <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {activeTab === 'income' ? 'Musteri' : 'Tedarikci'} secin
               </Text>
               <TouchableOpacity onPress={() => setShowPartyPicker(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
             <ScrollView>
               <TouchableOpacity
-                style={styles.pickerItem}
+                style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                 onPress={() => {
                   setFormData({ ...formData, relatedPartyId: '' });
                   setShowPartyPicker(false);
                 }}
               >
-                <Text style={styles.pickerItemText}>Seciniz</Text>
+                <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>Seciniz</Text>
               </TouchableOpacity>
               {relatedParties.map((party) => (
                 <TouchableOpacity
                   key={party.id}
-                  style={styles.pickerItem}
+                  style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                   onPress={() => {
                     setFormData({ ...formData, relatedPartyId: party.id });
                     setShowPartyPicker(false);
                   }}
                 >
-                  <Text style={styles.pickerItemText}>{party.name}</Text>
+                  <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
+                    {party.name}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -596,9 +642,7 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
   tab: {
     flex: 1,
@@ -607,23 +651,16 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#3b82f6',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
-  },
-  activeTabText: {
-    color: '#3b82f6',
   },
   summaryCard: {
-    backgroundColor: '#ffffff',
     margin: 16,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   summaryItem: {
     flexDirection: 'row',
@@ -632,7 +669,6 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#64748b',
     fontWeight: '600',
   },
   summaryAmount: {
@@ -649,14 +685,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   listItem: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   iconCircle: {
     width: 50,
@@ -672,21 +706,17 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 4,
   },
   itemDetail: {
     fontSize: 13,
-    color: '#64748b',
   },
   itemDescription: {
     fontSize: 13,
-    color: '#94a3b8',
     marginTop: 2,
   },
   itemDate: {
     fontSize: 12,
-    color: '#cbd5e1',
     marginTop: 4,
   },
   amountColumn: {
@@ -725,7 +755,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
@@ -737,11 +766,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 24,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
   },
   form: {
     paddingHorizontal: 24,
@@ -753,36 +783,28 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#0f172a',
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
   pickerButton: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
   },
   pickerValue: {
     fontSize: 16,
-    color: '#0f172a',
     fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: '#3b82f6',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -802,7 +824,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   pickerContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
@@ -810,11 +831,9 @@ const styles = StyleSheet.create({
   pickerItem: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   pickerItemText: {
     fontSize: 16,
-    color: '#0f172a',
     fontWeight: '600',
   },
 });

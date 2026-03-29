@@ -1,10 +1,10 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 const steps = [
-  'Ayarlar ekranindaki Hesap Silme bolumunden silme islemi baslatilir.',
-  'Islem onaylandiginda hesap ve bagli firma verileri silinir.',
-  'Silme sonrasinda kullanici uygulamadan cikis yaptirilir.',
-  'Yasal olarak saklanmasi gereken kayitlar varsa bunlar ayrica ele alinmalidir.',
+  'Ayarlar ekranindaki Hesap Silme bolumunden silme talebi baslatilir.',
+  'Talep onaylandiginda sistemde bir silme kaydi olusturulur.',
+  'Talep backend tarafinda islenir; uygun veriler silinir veya anonimlestirilir.',
+  'Yasal olarak saklanmasi gereken kayitlar varsa bunlar ayrica ele alinabilir.',
 ];
 
 export default function AccountDeletionScreen() {
@@ -27,8 +27,9 @@ export default function AccountDeletionScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Silme Sonrasi</Text>
         <Text style={styles.cardBody}>
-          Hesap silindikten sonra ayni e-posta ile yeniden giris yapabilmek icin
-          yeni bir hesap olusturmaniz gerekir. Mevcut oturum sonlandirilir.
+          Silme islemi tamamlandiginda hesaba yeniden erismek icin yeni bir hesap
+          olusturmaniz gerekebilir. Saklama zorunlulugu olan kayitlar mevzuata gore
+          korunabilir.
         </Text>
       </View>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  ListRenderItem,
   Modal,
   RefreshControl,
   ScrollView,
@@ -13,8 +14,11 @@ import {
 } from 'react-native';
 import { UserPlus, X, User, TrendingUp, TrendingDown, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { FirmaLogo } from '@/components/FirmaLogo';
 
 interface Customer {
   id: string;
@@ -67,6 +71,7 @@ interface SaleMovementRow {
 
 export default function Customers() {
   const { company } = useAuth();
+  const { theme } = useAppTheme();
   const [activeTab, setActiveTab] = useState<'customers' | 'suppliers'>(
     'customers'
   );
@@ -87,12 +92,13 @@ export default function Customers() {
     phone: '',
     address: '',
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const ensureCompany = () => {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadan firma olusturmaniz gerekiyor.'
+        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
       );
       return false;
     }
@@ -462,6 +468,7 @@ export default function Customers() {
         <Text
           style={[
             styles.balanceText,
+            { color: theme.colors.textMuted },
             isPositive && styles.balancePositive,
             isNegative && styles.balanceNegative,
           ]}
@@ -472,26 +479,35 @@ export default function Customers() {
     );
   };
 
-  const renderItem = ({ item }: { item: Customer | Supplier }) => (
-    <View style={styles.listItem}>
+  const renderItem: ListRenderItem<Customer | Supplier> = ({ item }) => (
+    <View
+      style={[
+        styles.listItem,
+        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+      ]}
+    >
       <TouchableOpacity
         style={styles.itemMainAction}
         onPress={() => openDetails(item)}
         activeOpacity={0.8}
       >
-        <View style={styles.itemIcon}>
-          <User size={24} color="#3b82f6" />
+        <View style={[styles.itemIcon, { backgroundColor: theme.colors.primarySoft }]}>
+          <User size={24} color={theme.colors.primary} />
         </View>
         <View style={styles.itemContent}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          {item.phone ? <Text style={styles.itemDetail}>{item.phone}</Text> : null}
-          {item.email ? <Text style={styles.itemDetail}>{item.email}</Text> : null}
+          <Text style={[styles.itemName, { color: theme.colors.text }]}>{item.name}</Text>
+          {item.phone ? (
+            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>{item.phone}</Text>
+          ) : null}
+          {item.email ? (
+            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>{item.email}</Text>
+          ) : null}
         </View>
         {renderBalance(item.balance)}
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.deleteButton}
+        style={[styles.deleteButton, { borderLeftColor: theme.colors.border }]}
         onPress={() => handleDelete(item)}
         disabled={deletingId === item.id}
         hitSlop={8}
@@ -506,55 +522,79 @@ export default function Customers() {
     () => (activeTab === 'customers' ? customers : suppliers),
     [activeTab, customers, suppliers]
   );
+  const filteredData = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase('tr-TR');
+    if (!normalizedQuery) {
+      return currentData;
+    }
+
+    return currentData.filter((item) =>
+      [item.name, item.phone, item.email, item.address]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLocaleLowerCase('tr-TR').includes(normalizedQuery)
+        )
+    );
+  }, [currentData, searchQuery]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Cari Yonetimi</Text>
-        <TouchableOpacity
-          onPress={() => {
-            if (!ensureCompany()) {
-              return;
-            }
-            setModalVisible(true);
-          }}
-          style={styles.addButton}
-        >
-          <UserPlus size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <LinearGradient
+        colors={[theme.colors.primaryStrong, theme.colors.primary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerBrand}>
+          <FirmaLogo size="sm" />
+          <TouchableOpacity
+            onPress={() => {
+              if (!ensureCompany()) {
+                return;
+              }
+              setModalVisible(true);
+            }}
+            style={styles.headerAddButton}
+          >
+            <UserPlus size={18} color="#ffffff" />
+            <Text style={styles.headerAddText}>Yeni Cari</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.tabs}>
+        <Text style={styles.title}>Cari Hesaplar</Text>
+        <TextInput
+          style={[
+            styles.searchInput,
+            { backgroundColor: theme.colors.surface, color: theme.colors.text },
+          ]}
+          placeholder="Arama"
+          placeholderTextColor={theme.colors.textSoft}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </LinearGradient>
+
+      <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'customers' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'customers' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
           onPress={() => setActiveTab('customers')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'customers' && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'customers' ? theme.colors.primary : theme.colors.textMuted }]}>
             Musteriler ({customers.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'suppliers' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'suppliers' && [styles.activeTab, { borderBottomColor: theme.colors.primary }]]}
           onPress={() => setActiveTab('suppliers')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'suppliers' && styles.activeTabText,
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'suppliers' ? theme.colors.primary : theme.colors.textMuted }]}>
             Tedarikciler ({suppliers.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={currentData}
+        data={filteredData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -563,9 +603,11 @@ export default function Customers() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <User size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>
-              Henuz {activeTab === 'customers' ? 'musteri' : 'tedarikci'} yok
+            <User size={48} color={theme.colors.textSoft} />
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
+              {searchQuery
+                ? 'Aramaniza uygun kayit bulunamadi'
+                : `Henuz ${activeTab === 'customers' ? 'musteri' : 'tedarikci'} yok`}
             </Text>
           </View>
         }
@@ -573,32 +615,48 @@ export default function Customers() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 Yeni {activeTab === 'customers' ? 'Musteri' : 'Tedarikci'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Isim *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Isim *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="Isim"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Telefon</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Telefon</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="Telefon"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.phone}
                   onChangeText={(text) => setFormData({ ...formData, phone: text })}
                   keyboardType="phone-pad"
@@ -606,10 +664,18 @@ export default function Customers() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>E-posta</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>E-posta</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="E-posta"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.email}
                   onChangeText={(text) => setFormData({ ...formData, email: text })}
                   keyboardType="email-address"
@@ -618,10 +684,19 @@ export default function Customers() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Adres</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Adres</Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[
+                    styles.input,
+                    styles.textArea,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="Adres"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.address}
                   onChangeText={(text) =>
                     setFormData({ ...formData, address: text })
@@ -632,7 +707,11 @@ export default function Customers() {
               </View>
 
               <TouchableOpacity
-                style={[styles.submitButton, saving && styles.buttonDisabled]}
+                style={[
+                  styles.submitButton,
+                  { backgroundColor: theme.colors.primary },
+                  saving && styles.buttonDisabled,
+                ]}
                 onPress={handleAdd}
                 disabled={saving}
               >
@@ -647,30 +726,43 @@ export default function Customers() {
 
       <Modal visible={detailVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.detailContent}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.detailContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <View>
-                <Text style={styles.modalTitle}>{selectedRecord?.name}</Text>
-                <Text style={styles.detailBalance}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{selectedRecord?.name}</Text>
+                <Text style={[styles.detailBalance, { color: theme.colors.textMuted }]}>
                   Bakiye: TL {Math.abs(Number(selectedRecord?.balance || 0)).toLocaleString('tr-TR')}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setDetailVisible(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.detailList}>
               {movements.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>Hesap hareketi bulunmuyor</Text>
+                  <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
+                    Hesap hareketi bulunmuyor
+                  </Text>
                 </View>
               ) : (
                 movements.map((movement) => (
-                  <View key={movement.id} style={styles.movementItem}>
+                  <View
+                    key={movement.id}
+                    style={[
+                      styles.movementItem,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                      },
+                    ]}
+                  >
                     <View style={styles.movementTextGroup}>
-                      <Text style={styles.movementTitle}>{movement.title}</Text>
-                      <Text style={styles.movementSubtitle}>
+                      <Text style={[styles.movementTitle, { color: theme.colors.text }]}>
+                        {movement.title}
+                      </Text>
+                      <Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>
                         {movement.subtitle} ·{' '}
                         {new Date(movement.date).toLocaleDateString('tr-TR')}
                       </Text>
@@ -703,33 +795,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    backgroundColor: '#ffffff',
-    padding: 24,
+    padding: 20,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  headerBrand: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  headerAddButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  headerAddText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginTop: 16,
+    marginBottom: 12,
   },
-  addButton: {
-    backgroundColor: '#3b82f6',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  searchInput: {
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#16203B',
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
   tab: {
     flex: 1,
@@ -738,25 +844,18 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#3b82f6',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748b',
-  },
-  activeTabText: {
-    color: '#3b82f6',
   },
   list: {
     padding: 16,
   },
   listItem: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -770,7 +869,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -781,12 +879,10 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 4,
   },
   itemDetail: {
     fontSize: 14,
-    color: '#64748b',
   },
   itemBalance: {
     alignItems: 'flex-end',
@@ -796,7 +892,6 @@ const styles = StyleSheet.create({
   balanceText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#64748b',
   },
   balancePositive: {
     color: '#22c55e',
@@ -809,7 +904,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 16,
     borderLeftWidth: 1,
-    borderLeftColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
@@ -836,14 +930,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
     maxHeight: '90%',
   },
   detailContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
@@ -856,15 +948,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 24,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
   },
   detailBalance: {
     fontSize: 14,
-    color: '#64748b',
     marginTop: 4,
   },
   form: {
@@ -877,24 +969,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#0f172a',
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
   },
   submitButton: {
-    backgroundColor: '#3b82f6',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -913,8 +1000,8 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   movementItem: {
-    backgroundColor: '#f8fafc',
     borderRadius: 12,
+    borderWidth: 1,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
@@ -928,12 +1015,10 @@ const styles = StyleSheet.create({
   movementTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 4,
   },
   movementSubtitle: {
     fontSize: 13,
-    color: '#64748b',
   },
   movementAmount: {
     fontSize: 15,

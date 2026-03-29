@@ -2,7 +2,7 @@
 
 Last updated: March 27, 2026
 
-Firma360 provides an in-app account deletion request flow from the Settings screen.
+CepteCari provides an in-app account deletion request flow from the Settings screen.
 
 ## How Users Can Request Deletion
 
@@ -15,7 +15,7 @@ Firma360 provides an in-app account deletion request flow from the Settings scre
 ## What Happens Next
 
 - The request is recorded immediately.
-- The user is signed out after the request is submitted.
+- The request is processed by backend/admin tooling.
 - Account and associated business data should then be deleted or anonymized during backend processing, except where retention is required for legal, tax, fraud-prevention, or security reasons.
 
 ## Public Deletion URL

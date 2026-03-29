@@ -13,6 +13,7 @@ import {
 import { PackagePlus, X, Package, TriangleAlert as AlertTriangle, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAppTheme } from '@/contexts/ThemeContext';
 
 interface Product {
   id: string;
@@ -27,6 +28,7 @@ interface Product {
 
 export default function Products() {
   const { company } = useAuth();
+  const { theme } = useAppTheme();
   const [products, setProducts] = useState<Product[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,7 +48,7 @@ export default function Products() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadan firma olusturmaniz gerekiyor.'
+        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
       );
       return false;
     }
@@ -164,31 +166,42 @@ export default function Products() {
     const isLowStock = item.stock_quantity <= item.min_stock_level;
 
     return (
-      <View style={styles.listItem}>
+      <View
+        style={[
+          styles.listItem,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View
           style={[
             styles.itemIcon,
-            isLowStock && { backgroundColor: '#fee2e2' },
+            {
+              backgroundColor: isLowStock
+                ? theme.colors.dangerSoft
+                : theme.colors.primarySoft,
+            },
           ]}
         >
           {isLowStock ? (
-            <AlertTriangle size={24} color="#ef4444" />
+            <AlertTriangle size={24} color={theme.colors.danger} />
           ) : (
-            <Package size={24} color="#3b82f6" />
+            <Package size={24} color={theme.colors.primary} />
           )}
         </View>
         <View style={styles.itemContent}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          {item.code ? <Text style={styles.itemDetail}>Kod: {item.code}</Text> : null}
-          <Text style={styles.itemDetail}>
+          <Text style={[styles.itemName, { color: theme.colors.text }]}>{item.name}</Text>
+          {item.code ? (
+            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>Kod: {item.code}</Text>
+          ) : null}
+          <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>
             Stok: {item.stock_quantity} {item.unit}
           </Text>
         </View>
         <View style={styles.itemPrice}>
-          <Text style={styles.priceText}>
+          <Text style={[styles.priceText, { color: theme.colors.text }]}>
             TL {Number(item.sale_price).toLocaleString('tr-TR')}
           </Text>
-          <Text style={styles.unitText}>/{item.unit}</Text>
+          <Text style={[styles.unitText, { color: theme.colors.textMuted }]}>/{item.unit}</Text>
         </View>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -204,9 +217,9 @@ export default function Products() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Stok Yonetimi</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Stok Yonetimi</Text>
         <TouchableOpacity
           onPress={() => {
             if (!ensureCompany()) {
@@ -214,7 +227,7 @@ export default function Products() {
             }
             setModalVisible(true);
           }}
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
         >
           <PackagePlus size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -230,38 +243,54 @@ export default function Products() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Package size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>Henuz urun yok</Text>
+            <Package size={48} color={theme.colors.textSoft} />
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henuz urun yok</Text>
           </View>
         }
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Yeni Urun</Text>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Urun</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={24} color="#64748b" />
+                <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Urun Adi *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Urun Adi *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="Urun adi"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Urun Kodu</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Urun Kodu</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="SKU"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.code}
                   onChangeText={(text) => setFormData({ ...formData, code: text })}
                 />
@@ -269,19 +298,35 @@ export default function Products() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, styles.halfInputLeft]}>
-                  <Text style={styles.label}>Birim</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Birim</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.text,
+                      },
+                    ]}
                     placeholder="adet"
+                    placeholderTextColor={theme.colors.textSoft}
                     value={formData.unit}
                     onChangeText={(text) => setFormData({ ...formData, unit: text })}
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={styles.label}>Stok Miktari</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Stok Miktari</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.text,
+                      },
+                    ]}
                     placeholder="0"
+                    placeholderTextColor={theme.colors.textSoft}
                     value={formData.stockQuantity}
                     onChangeText={(text) =>
                       setFormData({ ...formData, stockQuantity: text })
@@ -293,10 +338,18 @@ export default function Products() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, styles.halfInputLeft]}>
-                  <Text style={styles.label}>Alis Fiyati</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Alis Fiyati</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.text,
+                      },
+                    ]}
                     placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSoft}
                     value={formData.purchasePrice}
                     onChangeText={(text) =>
                       setFormData({ ...formData, purchasePrice: text })
@@ -305,10 +358,18 @@ export default function Products() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={styles.label}>Satis Fiyati</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Satis Fiyati</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: theme.colors.surfaceMuted,
+                        borderColor: theme.colors.border,
+                        color: theme.colors.text,
+                      },
+                    ]}
                     placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSoft}
                     value={formData.salePrice}
                     onChangeText={(text) =>
                       setFormData({ ...formData, salePrice: text })
@@ -319,10 +380,18 @@ export default function Products() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Min. Stok Seviyesi</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Min. Stok Seviyesi</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
                   placeholder="0"
+                  placeholderTextColor={theme.colors.textSoft}
                   value={formData.minStockLevel}
                   onChangeText={(text) =>
                     setFormData({ ...formData, minStockLevel: text })
@@ -332,7 +401,11 @@ export default function Products() {
               </View>
 
               <TouchableOpacity
-                style={[styles.submitButton, saving && styles.buttonDisabled]}
+                style={[
+                  styles.submitButton,
+                  { backgroundColor: theme.colors.primary },
+                  saving && styles.buttonDisabled,
+                ]}
                 onPress={handleAdd}
                 disabled={saving}
               >
@@ -380,20 +453,17 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   listItem: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   itemIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#dbeafe',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -404,12 +474,10 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 4,
   },
   itemDetail: {
     fontSize: 14,
-    color: '#64748b',
   },
   itemPrice: {
     alignItems: 'flex-end',
@@ -418,11 +486,9 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
   },
   unitText: {
     fontSize: 12,
-    color: '#64748b',
   },
   deleteButton: {
     minWidth: 52,
@@ -452,7 +518,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 24,
@@ -464,12 +529,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 24,
+    paddingBottom: 18,
+    borderBottomWidth: 1,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
+  modalTitle: { fontSize: 20, fontWeight: '700' },
   form: {
     paddingHorizontal: 24,
     paddingBottom: 24,
@@ -491,20 +554,15 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: '#0f172a',
   },
   submitButton: {
-    backgroundColor: '#3b82f6',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

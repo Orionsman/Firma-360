@@ -85,6 +85,11 @@ const getReadableAuthError = (error: unknown) => {
   return message;
 };
 
+const getUserId = (
+  overrideUserId?: string,
+  fallbackUser?: User | null
+) => overrideUserId ?? fallbackUser?.id ?? null;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -170,13 +175,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { requiresEmailConfirmation: true };
     }
 
-    await createCompanyProfile(companyName);
+    setSession(authData.session);
+    setUser(authData.user);
+
+    await createCompanyProfile(companyName, authData.user.id);
+    await fetchCompany(authData.user.id);
 
     return { requiresEmailConfirmation: false };
   };
 
-  const createCompanyProfile = async (companyName: string) => {
-    if (!user) {
+  const createCompanyProfile = async (
+    companyName: string,
+    overrideUserId?: string
+  ) => {
+    const resolvedUserId = getUserId(overrideUserId, user);
+
+    if (!resolvedUserId) {
       throw new Error('Oturum bulunamadi. Lutfen yeniden giris yapin.');
     }
 
@@ -188,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: existingMembership, error: membershipError } = await supabase
       .from('user_companies')
       .select('company_id')
-      .eq('user_id', user.id)
+      .eq('user_id', resolvedUserId)
       .maybeSingle();
 
     if (membershipError) {
@@ -211,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(getReadableAuthError(rpcError));
     }
 
-    await refreshCompany();
+    await fetchCompany(resolvedUserId);
   };
 
   const signOut = async () => {
@@ -244,8 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshCompany = async () => {
-    if (user) {
-      await fetchCompany(user.id);
+    const resolvedUserId = getUserId(undefined, user);
+    if (resolvedUserId) {
+      await fetchCompany(resolvedUserId);
     }
   };
 

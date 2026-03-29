@@ -1,495 +1,652 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
+  Alert,
   RefreshControl,
-  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  BarChart3,
+  CreditCard,
+  Package,
+  Plus,
+  ShoppingCart,
+  Users,
+} from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import {
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Package,
-  ShoppingCart,
-  DollarSign,
-} from 'lucide-react-native';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { FirmaLogo } from '@/components/FirmaLogo';
 
-interface Stats {
-  totalSales: number;
+interface DashboardStats {
+  totalReceivables: number;
+  totalPayables: number;
+  cashBalance: number;
   totalCustomers: number;
   totalProducts: number;
-  totalPayments: number;
-  lowStockProducts: number;
+  totalSales: number;
 }
 
-interface DetailItem {
+interface ActivityItem {
   id: string;
   title: string;
   subtitle: string;
-  value: string;
+  amount: number;
+  tone: 'positive' | 'negative';
 }
 
+type RelationRecord = { name?: string } | { name?: string }[] | null | undefined;
+
 export default function Dashboard() {
-  const { company } = useAuth();
-  const [stats, setStats] = useState<Stats>({
+  const { company, createCompanyProfile } = useAuth();
+  const { theme } = useAppTheme();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalReceivables: 0,
+    totalPayables: 0,
+    cashBalance: 0,
+    totalCustomers: 0,
+    totalProducts: 0,
     totalSales: 0,
-      totalCustomers: 0,
-      totalProducts: 0,
-      totalPayments: 0,
-      lowStockProducts: 0,
   });
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [detailVisible, setDetailVisible] = useState(false);
-  const [detailTitle, setDetailTitle] = useState('');
-  const [detailItems, setDetailItems] = useState<DetailItem[]>([]);
+  const [companyName, setCompanyName] = useState('');
+  const [creatingCompany, setCreatingCompany] = useState(false);
 
-  const fetchStats = async () => {
-    if (!company) return;
-
-    try {
-      const [salesData, customersData, productsData, paymentsData] =
-        await Promise.all([
-          supabase
-            .from('sales')
-            .select('total_amount')
-            .eq('company_id', company.id),
-          supabase.from('customers').select('id').eq('company_id', company.id),
-          supabase
-            .from('products')
-            .select('stock_quantity, min_stock_level')
-            .eq('company_id', company.id),
-          supabase
-            .from('payments')
-            .select('amount, payment_type')
-            .eq('company_id', company.id),
-        ]);
-
-      const totalSales =
-        salesData.data?.reduce((sum, sale) => sum + Number(sale.total_amount), 0) ||
-        0;
-
-      const lowStockProducts =
-        productsData.data?.filter(
-          (p) => p.stock_quantity <= p.min_stock_level
-        ).length || 0;
-
-      const totalPayments =
-        paymentsData.data?.reduce((sum, payment) => {
-          const amount = Number(payment.amount);
-          return payment.payment_type === 'income'
-            ? sum + amount
-            : sum - amount;
-        }, 0) || 0;
-
+  const fetchDashboard = async () => {
+    if (!company) {
       setStats({
-        totalSales,
-        totalCustomers: customersData.data?.length || 0,
-        totalProducts: productsData.data?.length || 0,
-        totalPayments,
-        lowStockProducts,
+        totalReceivables: 0,
+        totalPayables: 0,
+        cashBalance: 0,
+        totalCustomers: 0,
+        totalProducts: 0,
+        totalSales: 0,
       });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
+      setRecentActivity([]);
+      return;
     }
+
+    const [salesResult, paymentsResult, customersResult, productsResult] =
+      await Promise.all([
+        supabase
+          .from('sales')
+          .select('id, total_amount, sale_date, customers(name)')
+          .eq('company_id', company.id)
+          .order('sale_date', { ascending: false }),
+        supabase
+          .from('payments')
+          .select(
+            'id, amount, payment_date, payment_type, customers(name), suppliers(name), description'
+          )
+          .eq('company_id', company.id)
+          .order('payment_date', { ascending: false }),
+        supabase.from('customers').select('id').eq('company_id', company.id),
+        supabase.from('products').select('id').eq('company_id', company.id),
+      ]);
+
+    if (salesResult.error || paymentsResult.error || customersResult.error || productsResult.error) {
+      Alert.alert(
+        'Hata',
+        salesResult.error?.message ||
+          paymentsResult.error?.message ||
+          customersResult.error?.message ||
+          productsResult.error?.message ||
+          'Veriler yuklenemedi.'
+      );
+      return;
+    }
+
+    const sales = salesResult.data ?? [];
+    const payments = paymentsResult.data ?? [];
+    const totalSales = sales.reduce(
+      (sum, sale) => sum + Number(sale.total_amount || 0),
+      0
+    );
+    const totalIncome = payments
+      .filter((payment) => payment.payment_type === 'income')
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const totalExpense = payments
+      .filter((payment) => payment.payment_type === 'expense')
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+    const getRelationName = (value: RelationRecord) => {
+      if (!value) {
+        return undefined;
+      }
+
+      return Array.isArray(value) ? value[0]?.name : value.name;
+    };
+
+    const activities: ActivityItem[] = [
+      ...sales.slice(0, 6).map((sale) => ({
+        id: `sale-${sale.id}`,
+        title: getRelationName(sale.customers as RelationRecord) || 'Musteri satisi',
+        subtitle: new Date(sale.sale_date).toLocaleDateString('tr-TR'),
+        amount: Number(sale.total_amount || 0),
+        tone: 'positive' as const,
+      })),
+      ...payments.slice(0, 6).map((payment) => ({
+        id: `payment-${payment.id}`,
+        title:
+          payment.payment_type === 'income'
+            ? getRelationName(payment.customers as RelationRecord) || 'Tahsilat'
+            : getRelationName(payment.suppliers as RelationRecord) || 'Odeme',
+        subtitle:
+          payment.description ||
+          new Date(payment.payment_date).toLocaleDateString('tr-TR'),
+        amount: Number(payment.amount || 0),
+        tone: payment.payment_type === 'income' ? ('positive' as const) : ('negative' as const),
+      })),
+    ]
+      .sort((a, b) => b.id.localeCompare(a.id))
+      .slice(0, 5);
+
+    setStats({
+      totalReceivables: Math.max(totalSales - totalIncome, 0),
+      totalPayables: totalExpense,
+      cashBalance: totalIncome - totalExpense,
+      totalCustomers: customersResult.data?.length || 0,
+      totalProducts: productsResult.data?.length || 0,
+      totalSales,
+    });
+    setRecentActivity(activities);
   };
 
   useEffect(() => {
-    fetchStats();
+    void fetchDashboard();
   }, [company]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStats();
+    await fetchDashboard();
     setRefreshing(false);
   };
 
-  const getRelationItem = <T,>(value?: T | T[] | null): T | null => {
-    if (!value) {
-      return null;
-    }
-
-    return Array.isArray(value) ? value[0] || null : value;
-  };
-
-  const openSalesDetails = async () => {
-    if (!company) {
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('sales')
-      .select('id, total_amount, sale_date, customers(name)')
-      .eq('company_id', company.id)
-      .order('sale_date', { ascending: false })
-      .limit(20);
-
-    if (error) {
-      return;
-    }
-
-    setDetailTitle('Toplam Satis');
-    setDetailItems(
-      (data ?? []).map((sale) => ({
-        id: sale.id,
-        title: getRelationItem(sale.customers)?.name || 'Musteri yok',
-        subtitle: new Date(sale.sale_date).toLocaleDateString('tr-TR'),
-        value: `TL ${Number(sale.total_amount).toLocaleString('tr-TR')}`,
-      }))
-    );
-    setDetailVisible(true);
-  };
-
-  const openPaymentDetails = async () => {
-    if (!company) {
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('payments')
-      .select('id, amount, payment_date, payment_type, customers(name), suppliers(name)')
-      .eq('company_id', company.id)
-      .order('payment_date', { ascending: false })
-      .limit(20);
-
-    if (error) {
-      return;
-    }
-
-    setDetailTitle('Toplam Odeme');
-    setDetailItems(
-      (data ?? []).map((payment) => ({
-        id: payment.id,
-        title:
-          payment.payment_type === 'income'
-            ? getRelationItem(payment.customers)?.name || 'Musteri yok'
-            : getRelationItem(payment.suppliers)?.name || 'Tedarikci yok',
-        subtitle: new Date(payment.payment_date).toLocaleDateString('tr-TR'),
-        value: `${payment.payment_type === 'income' ? '+' : '-'}TL ${Number(payment.amount).toLocaleString('tr-TR')}`,
-      }))
-    );
-    setDetailVisible(true);
-  };
-
-  const openCustomerDetails = async () => {
-    if (!company) {
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, name, phone, email')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      return;
-    }
-
-    setDetailTitle('Musteriler');
-    setDetailItems(
-      (data ?? []).map((customer) => ({
-        id: customer.id,
-        title: customer.name,
-        subtitle: customer.phone || customer.email || 'Detay yok',
-        value: '',
-      }))
-    );
-    setDetailVisible(true);
-  };
-
-  const openProductDetails = async () => {
-    if (!company) {
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, stock_quantity, unit')
-      .eq('company_id', company.id)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      return;
-    }
-
-    setDetailTitle('Urunler');
-    setDetailItems(
-      (data ?? []).map((product) => ({
-        id: product.id,
-        title: product.name,
-        subtitle: 'Stok',
-        value: `${Number(product.stock_quantity).toLocaleString('tr-TR')} ${product.unit}`,
-      }))
-    );
-    setDetailVisible(true);
-  };
+  const quickActions = useMemo(
+    () => [
+      {
+        key: 'customers',
+        label: 'Cari Hesaplar',
+        icon: Users,
+        onPress: () => router.push('/(tabs)/customers'),
+      },
+      {
+        key: 'sales',
+        label: 'Yeni Islem',
+        icon: Plus,
+        onPress: () => router.push('/(tabs)/sales'),
+      },
+      {
+        key: 'payments',
+        label: 'Hareketler',
+        icon: CreditCard,
+        onPress: () => router.push('/(tabs)/payments'),
+      },
+      {
+        key: 'products',
+        label: 'Stoklar',
+        icon: Package,
+        onPress: () => router.push('/(tabs)/products'),
+      },
+      {
+        key: 'reports',
+        label: 'Raporlar',
+        icon: BarChart3,
+        onPress: () => router.push('/(tabs)/payments'),
+      },
+      {
+        key: 'sales-list',
+        label: 'Satislar',
+        icon: ShoppingCart,
+        onPress: () => router.push('/(tabs)/sales'),
+      },
+    ],
+    []
+  );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Merhaba!</Text>
-          <Text style={styles.companyName}>{company?.name || 'Firma'}</Text>
-        </View>
-      </View>
-
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <View style={styles.statsGrid}>
-          <TouchableOpacity style={styles.statCard} onPress={openSalesDetails}>
-            <View style={[styles.iconContainer, { backgroundColor: '#dbeafe' }]}>
-              <ShoppingCart size={24} color="#3b82f6" />
+        <LinearGradient
+          colors={[theme.colors.primaryStrong, theme.colors.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.hero}
+        >
+          <View style={styles.heroTop}>
+            <FirmaLogo size="sm" />
+            <View style={styles.profileDot}>
+              <Text style={styles.profileDotText}>C</Text>
             </View>
-            <Text style={styles.statValue}>
-              TL {stats.totalSales.toLocaleString('tr-TR')}
-            </Text>
-            <Text style={styles.statLabel}>Toplam Satis</Text>
-          </TouchableOpacity>
+          </View>
 
-          <TouchableOpacity style={styles.statCard} onPress={openPaymentDetails}>
-            <View style={[styles.iconContainer, { backgroundColor: '#dcfce7' }]}>
-              <DollarSign size={24} color="#22c55e" />
-            </View>
-            <Text style={styles.statValue}>
-              TL {stats.totalPayments.toLocaleString('tr-TR')}
-            </Text>
-            <Text style={styles.statLabel}>Toplam Odeme</Text>
-          </TouchableOpacity>
+          <Text style={styles.heroGreeting}>Merhaba, {company?.name || 'CepteCari'}!</Text>
+          <Text style={styles.heroSubtitle}>Cari takibin cebinde</Text>
 
-          <TouchableOpacity style={styles.statCard} onPress={openCustomerDetails}>
-            <View style={[styles.iconContainer, { backgroundColor: '#fef3c7' }]}>
-              <Users size={24} color="#f59e0b" />
-            </View>
-            <Text style={styles.statValue}>{stats.totalCustomers}</Text>
-            <Text style={styles.statLabel}>Musteriler</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.statCard} onPress={openProductDetails}>
-            <View style={[styles.iconContainer, { backgroundColor: '#e0e7ff' }]}>
-              <Package size={24} color="#6366f1" />
-            </View>
-            <Text style={styles.statValue}>{stats.totalProducts}</Text>
-            <Text style={styles.statLabel}>Urunler</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.alertsSection}>
-          <Text style={styles.sectionTitle}>Bildirimler</Text>
-
-          {stats.lowStockProducts > 0 && (
-            <View style={[styles.alertCard, { borderLeftColor: '#ef4444' }]}>
-              <TrendingDown size={20} color="#ef4444" />
-              <Text style={styles.alertText}>
-                {stats.lowStockProducts} urunun stok seviyesi dusuk
+          <View style={styles.summaryStack}>
+            <View style={[styles.summaryCard, styles.summaryRed]}>
+              <Text style={styles.summaryLabel}>Alacaklar</Text>
+              <Text style={styles.summaryValue}>
+                {stats.totalReceivables.toLocaleString('tr-TR')} ₺
               </Text>
             </View>
-          )}
-
-          {stats.lowStockProducts === 0 && (
-            <View style={styles.noAlerts}>
-              <Text style={styles.noAlertsText}>
-                Su anda bildirim bulunmuyor
+            <View style={[styles.summaryCard, styles.summaryBlue]}>
+              <Text style={styles.summaryLabel}>Borclar</Text>
+              <Text style={styles.summaryValue}>
+                {stats.totalPayables.toLocaleString('tr-TR')} ₺
               </Text>
             </View>
-          )}
-        </View>
-      </ScrollView>
+            <View style={[styles.summaryCardWide, styles.summaryGreen]}>
+              <Text style={styles.summaryLabel}>Kasa Bakiyesi</Text>
+              <Text style={styles.summaryValue}>
+                {stats.cashBalance.toLocaleString('tr-TR')} ₺
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
 
-      <Modal visible={detailVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{detailTitle}</Text>
-            <ScrollView contentContainerStyle={styles.detailList}>
-              {detailItems.map((item) => (
-                <View key={item.id} style={styles.detailCard}>
-                  <View style={styles.detailText}>
-                    <Text style={styles.detailTitle}>{item.title}</Text>
-                    <Text style={styles.detailSubtitle}>{item.subtitle}</Text>
-                  </View>
-                  {item.value ? <Text style={styles.detailValue}>{item.value}</Text> : null}
-                </View>
-              ))}
-            </ScrollView>
+        {!company ? (
+          <View
+            style={[
+              styles.setupCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <Text style={[styles.setupTitle, { color: theme.colors.text }]}>
+              Ilk firma kaydini olusturun
+            </Text>
+            <Text style={[styles.setupText, { color: theme.colors.textMuted }]}>
+              Cari, borc ve alacak takibini baslatmak icin firma adinizi girin.
+            </Text>
+
+            <TextInput
+              style={[
+                styles.setupInput,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
+              placeholder="Firma adi"
+              placeholderTextColor={theme.colors.textSoft}
+              value={companyName}
+              onChangeText={setCompanyName}
+            />
+
             <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setDetailVisible(false)}
+              style={[
+                styles.setupButton,
+                { backgroundColor: theme.colors.primary },
+                creatingCompany && styles.buttonDisabled,
+              ]}
+              disabled={creatingCompany}
+              onPress={async () => {
+                if (!companyName.trim()) {
+                  Alert.alert('Hata', 'Lutfen firma adi girin.');
+                  return;
+                }
+
+                setCreatingCompany(true);
+                try {
+                  await createCompanyProfile(companyName);
+                  setCompanyName('');
+                  Alert.alert('Basarili', 'Firma olusturuldu.');
+                } catch (error: unknown) {
+                  Alert.alert(
+                    'Hata',
+                    error instanceof Error ? error.message : 'Firma olusturulamadi.'
+                  );
+                } finally {
+                  setCreatingCompany(false);
+                }
+              }}
             >
-              <Text style={styles.closeButtonText}>Kapat</Text>
+              <Text style={styles.setupButtonText}>
+                {creatingCompany ? 'Olusturuluyor...' : 'Firma Olustur'}
+              </Text>
             </TouchableOpacity>
           </View>
+        ) : null}
+
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Hizli Islemler</Text>
+          </View>
+          <View style={styles.quickGrid}>
+            {quickActions.map((action) => {
+              const Icon = action.icon;
+
+              return (
+                <TouchableOpacity
+                  key={action.key}
+                  style={[styles.quickAction, { backgroundColor: theme.colors.surfaceMuted }]}
+                  onPress={action.onPress}
+                >
+                  <View
+                    style={[
+                      styles.quickIconWrap,
+                      { backgroundColor: theme.colors.primarySoft },
+                    ]}
+                  >
+                    <Icon size={18} color={theme.colors.primary} />
+                  </View>
+                  <Text style={[styles.quickLabel, { color: theme.colors.text }]}>
+                    {action.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
-      </Modal>
+
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Son Hareketler</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/payments')}>
+              <Text style={[styles.seeAll, { color: theme.colors.primary }]}>Tumunu Gor</Text>
+            </TouchableOpacity>
+          </View>
+
+          {recentActivity.length === 0 ? (
+            <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
+              Henuz hareket bulunmuyor.
+            </Text>
+          ) : (
+            recentActivity.map((item) => (
+              <View
+                key={item.id}
+                style={[styles.activityRow, { borderBottomColor: theme.colors.border }]}
+              >
+                <View style={styles.activityAvatar}>
+                  <Text style={styles.activityAvatarText}>
+                    {item.title.slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.activityText}>
+                  <Text style={[styles.activityTitle, { color: theme.colors.text }]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.activitySubtitle, { color: theme.colors.textMuted }]}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.activityAmount,
+                    {
+                      color:
+                        item.tone === 'positive' ? theme.colors.success : theme.colors.danger,
+                    },
+                  ]}
+                >
+                  {item.tone === 'positive' ? '+' : '-'}
+                  {item.amount.toLocaleString('tr-TR')} ₺
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        <View style={[styles.metaRow, { backgroundColor: theme.colors.surfaceMuted }]}>
+          <View style={styles.metaBox}>
+            <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+              {stats.totalCustomers}
+            </Text>
+            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>
+              Cari Hesap
+            </Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaBox}>
+            <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+              {stats.totalProducts}
+            </Text>
+            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>Stok Kalemi</Text>
+          </View>
+          <View style={styles.metaDivider} />
+          <View style={styles.metaBox}>
+            <Text style={[styles.metaValue, { color: theme.colors.text }]}>
+              {stats.totalSales.toLocaleString('tr-TR')} ₺
+            </Text>
+            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>Toplam Satis</Text>
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
+  content: { paddingBottom: 28 },
+  hero: {
+    paddingTop: 58,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: 24,
-    paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  profileDot: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileDotText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  heroGreeting: {
+    color: '#FFFFFF',
+    fontSize: 26,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  heroSubtitle: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 13,
+    marginTop: 2,
+  },
+  summaryStack: {
+    marginTop: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  summaryCard: {
+    flex: 1,
+    minWidth: 140,
+    borderRadius: 16,
+    padding: 14,
+  },
+  summaryCardWide: {
+    width: '100%',
+    borderRadius: 16,
+    padding: 14,
+  },
+  summaryRed: { backgroundColor: '#FF626B' },
+  summaryBlue: { backgroundColor: '#2F80ED' },
+  summaryGreen: { backgroundColor: '#38C977' },
+  summaryLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    opacity: 0.92,
+  },
+  summaryValue: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  setupCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 18,
+  },
+  setupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  setupText: {
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 6,
+    marginBottom: 14,
+  },
+  setupInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 15,
+    marginBottom: 12,
+  },
+  setupButton: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  setupButtonText: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  buttonDisabled: { opacity: 0.6 },
+  sectionCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 18,
+    padding: 16,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  greeting: {
-    fontSize: 16,
-    color: '#64748b',
-  },
-  companyName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginTop: 4,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 16,
-    gap: 16,
-  },
-  statCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    width: '47%',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#64748b',
-  },
-  alertsSection: {
-    padding: 16,
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 16,
+    fontWeight: '800',
   },
-  alertCard: {
-    backgroundColor: '#ffffff',
+  seeAll: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  quickAction: {
+    width: '31%',
+    minWidth: 100,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  quickIconWrap: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  quickLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyState: {
+    fontSize: 14,
+    paddingBottom: 6,
+  },
+  activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
-  alertText: {
-    fontSize: 14,
-    color: '#334155',
-    flex: 1,
-  },
-  noAlerts: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 24,
+  activityAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E8ECFF',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  noAlertsText: {
-    fontSize: 14,
-    color: '#94a3b8',
+  activityAvatarText: {
+    color: '#3156F5',
+    fontWeight: '800',
+    fontSize: 15,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 16,
-  },
-  detailList: {
-    paddingBottom: 16,
-  },
-  detailCard: {
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  detailText: {
+  activityText: {
     flex: 1,
   },
-  detailTitle: {
+  activityTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 4,
   },
-  detailSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
+  activitySubtitle: {
+    fontSize: 12,
+    marginTop: 3,
   },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0f172a',
+  activityAmount: {
+    fontSize: 18,
+    fontWeight: '800',
   },
-  closeButton: {
-    backgroundColor: '#3b82f6',
-    borderRadius: 12,
-    padding: 16,
+  metaRow: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  metaBox: {
+    flex: 1,
     alignItems: 'center',
   },
-  closeButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+  metaDivider: {
+    width: 1,
+    height: 34,
+    backgroundColor: 'rgba(108, 120, 160, 0.25)',
+  },
+  metaValue: {
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  metaLabel: {
+    fontSize: 12,
+    marginTop: 4,
   },
 });

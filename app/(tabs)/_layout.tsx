@@ -9,9 +9,11 @@ import {
   Users,
   Wallet,
 } from 'lucide-react-native';
+import { useAppTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const bottomInset =
     Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom;
 
@@ -19,19 +21,21 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#3b82f6',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSoft,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.colors.surface,
           borderTopWidth: 1,
-          borderTopColor: '#e2e8f0',
-          height: 58 + bottomInset,
+          borderTopColor: theme.colors.border,
+          height: 66 + bottomInset,
           paddingBottom: bottomInset,
-          paddingTop: 8,
+          paddingTop: 10,
+          borderTopLeftRadius: 18,
+          borderTopRightRadius: 18,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontWeight: '700',
         },
       }}
     >

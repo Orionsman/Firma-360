@@ -2,7 +2,7 @@
 
 Last updated: March 27, 2026
 
-Firma360 helps businesses manage customers, suppliers, products, sales, and payments. This policy is written so it can be published on a public website before App Store and Google Play submission.
+CepteCari helps users manage receivables, payables, customers, suppliers, products, sales, and payments. This policy is written so it can be published on a public website before App Store and Google Play submission.
 
 ## Data We Collect
 
@@ -42,5 +42,5 @@ We use reasonable technical and organizational measures to protect account and b
 Before store submission, replace this section with a real support email and company contact address.
 
 - Support email: support@firma360.example
-- Company: Firma360
+- Company: CepteCari
 

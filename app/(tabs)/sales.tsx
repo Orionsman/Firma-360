@@ -14,6 +14,7 @@ import { Plus, X, ShoppingCart, Check, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { useAppTheme } from '@/contexts/ThemeContext';
 
 interface Sale {
   id: string;
@@ -50,18 +51,13 @@ interface SaleItem {
   productName: string;
   quantity: number;
   unitPrice: number;
-  total: number;
   availableStock: number;
   unit: string;
 }
 
-interface StoredSaleItem {
-  product_id: string;
-  quantity: number;
-}
-
 export default function Sales() {
   const { company } = useAuth();
+  const { theme } = useAppTheme();
   const [sales, setSales] = useState<Sale[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,7 +74,7 @@ export default function Sales() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadan firma olusturmaniz gerekiyor.'
+        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
       );
       return false;
     }
@@ -173,7 +169,6 @@ export default function Sales() {
             ? {
                 ...item,
                 quantity: item.quantity + 1,
-                total: (item.quantity + 1) * item.unitPrice,
               }
             : item
         )
@@ -186,7 +181,6 @@ export default function Sales() {
           productName: product.name,
           quantity: 1,
           unitPrice: product.sale_price,
-          total: product.sale_price,
           availableStock: product.stock_quantity,
           unit: product.unit,
         },
@@ -220,14 +214,14 @@ export default function Sales() {
     setSaleItems((current) =>
       current.map((item) =>
         item.productId === productId
-          ? { ...item, quantity, total: quantity * item.unitPrice }
+          ? { ...item, quantity }
           : item
       )
     );
   };
 
   const getTotalAmount = () =>
-    saleItems.reduce((sum, item) => sum + item.total, 0);
+    saleItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
   const handleCreateSale = async () => {
     if (!selectedCustomer) {
@@ -246,73 +240,19 @@ export default function Sales() {
 
     setSaving(true);
     try {
-      const totalAmount = getTotalAmount();
       const saleNumber = `SAT-${Date.now()}`;
-      const insufficientStockItem = saleItems.find(
-        (item) => item.quantity > item.availableStock
-      );
-
-      if (insufficientStockItem) {
-        throw new Error(
-          `${insufficientStockItem.productName} icin yeterli stok bulunmuyor.`
-        );
-      }
-
-      const { data: saleData, error: saleError } = await supabase
-        .from('sales')
-        .insert({
-          company_id: company!.id,
-          customer_id: selectedCustomer,
-          sale_number: saleNumber,
-          total_amount: totalAmount,
-          paid_amount: 0,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (saleError) {
-        throw saleError;
-      }
-
-      const { error: itemsError } = await supabase.from('sale_items').insert(
-        saleItems.map((item) => ({
-          sale_id: saleData.id,
-          product_id: item.productId,
+      const { error } = await supabase.rpc('create_sale_with_items', {
+        target_customer_id: selectedCustomer,
+        sale_items_payload: saleItems.map((item) => ({
+          productId: item.productId,
           quantity: item.quantity,
-          unit_price: item.unitPrice,
-          total_price: item.total,
-        }))
-      );
+          unitPrice: item.unitPrice,
+        })),
+        target_sale_number: saleNumber,
+      });
 
-      if (itemsError) {
-        throw itemsError;
-      }
-
-      for (const item of saleItems) {
-        const { error: stockError } = await supabase.rpc('decrement_stock', {
-          product_id: item.productId,
-          qty: item.quantity,
-        });
-
-        if (stockError) {
-          throw stockError;
-        }
-
-        const { error: movementError } = await supabase
-          .from('stock_movements')
-          .insert({
-            company_id: company!.id,
-            product_id: item.productId,
-            movement_type: 'out',
-            quantity: item.quantity,
-            reference_id: saleData.id,
-            notes: `Satis: ${saleNumber}`,
-          });
-
-        if (movementError) {
-          throw movementError;
-        }
+      if (error) {
+        throw error;
       }
 
       setSelectedCustomer('');
@@ -337,43 +277,12 @@ export default function Sales() {
     try {
       setDeletingId(sale.id);
 
-      const { data: storedItems, error: itemsFetchError } = await supabase
-        .from('sale_items')
-        .select('product_id, quantity')
-        .eq('sale_id', sale.id);
+      const { error } = await supabase.rpc('delete_sale_with_restock', {
+        target_sale_id: sale.id,
+      });
 
-      if (itemsFetchError) {
-        throw itemsFetchError;
-      }
-
-      for (const item of (storedItems as StoredSaleItem[]) ?? []) {
-        const { error: stockError } = await supabase.rpc('increment_stock', {
-          product_id: item.product_id,
-          qty: item.quantity,
-        });
-
-        if (stockError) {
-          throw stockError;
-        }
-      }
-
-      const { error: movementDeleteError } = await supabase
-        .from('stock_movements')
-        .delete()
-        .eq('reference_id', sale.id);
-
-      if (movementDeleteError) {
-        throw movementDeleteError;
-      }
-
-      const { error: saleDeleteError } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', sale.id)
-        .eq('company_id', company.id);
-
-      if (saleDeleteError) {
-        throw saleDeleteError;
+      if (error) {
+        throw error;
       }
 
       await Promise.all([fetchSales(), fetchProducts(), fetchCustomers()]);
@@ -396,21 +305,26 @@ export default function Sales() {
   };
 
   const renderSale = ({ item }: { item: Sale }) => (
-    <View style={styles.listItem}>
+    <View
+      style={[
+        styles.listItem,
+        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+      ]}
+    >
       <View style={styles.itemContent}>
-        <Text style={styles.itemCustomerLarge}>
+        <Text style={[styles.itemCustomerLarge, { color: theme.colors.text }]}>
           {getRelationItem(item.customers)?.name || 'Musteri yok'}
         </Text>
-        <Text style={styles.itemDate}>
+        <Text style={[styles.itemDate, { color: theme.colors.textSoft }]}>
           {new Date(item.sale_date).toLocaleDateString('tr-TR')}
         </Text>
-        <Text style={styles.itemProductNames}>
+        <Text style={[styles.itemProductNames, { color: theme.colors.textMuted }]}>
           {item.sale_items
             ?.map((saleItem) => getRelationItem(saleItem.products)?.name)
             .filter(Boolean)
             .join(', ') || 'Urun yok'}
         </Text>
-        <Text style={styles.itemDetails}>
+        <Text style={[styles.itemDetails, { color: theme.colors.textSoft }]}>
           {item.sale_items
             ?.map((saleItem) => {
               const quantity = Number(saleItem.quantity || 0);
@@ -426,7 +340,7 @@ export default function Sales() {
         </Text>
       </View>
       <View style={styles.itemRight}>
-        <Text style={styles.itemAmount}>
+        <Text style={[styles.itemAmount, { color: theme.colors.text }]}>
           TL {Number(item.total_amount).toLocaleString('tr-TR')}
         </Text>
       </View>
@@ -447,9 +361,9 @@ export default function Sales() {
     'Seciniz';
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Satislar</Text>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>Satislar</Text>
         <TouchableOpacity
           onPress={() => {
             if (!ensureCompany()) {
@@ -457,7 +371,7 @@ export default function Sales() {
             }
             setModalVisible(true);
           }}
-          style={styles.addButton}
+          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
         >
           <Plus size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -473,82 +387,104 @@ export default function Sales() {
         }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <ShoppingCart size={48} color="#cbd5e1" />
-            <Text style={styles.emptyText}>Henuz satis yok</Text>
+            <ShoppingCart size={48} color={theme.colors.textSoft} />
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henuz satis yok</Text>
           </View>
         }
       />
 
       <Modal visible={modalVisible} animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Yeni Satis</Text>
+        <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Satis</Text>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <X size={24} color="#64748b" />
+              <X size={24} color={theme.colors.textMuted} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
             <TouchableOpacity
-              style={styles.pickerButton}
+              style={[styles.pickerButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
               onPress={() => setShowCustomerPicker(true)}
             >
-              <Text style={styles.pickerLabel}>Musteri</Text>
-              <Text style={styles.pickerValue}>{selectedCustomerName}</Text>
+              <Text style={[styles.pickerLabel, { color: theme.colors.textMuted }]}>Musteri</Text>
+              <Text style={[styles.pickerValue, { color: theme.colors.text }]}>{selectedCustomerName}</Text>
             </TouchableOpacity>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Urunler</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Urunler</Text>
               {saleItems.map((item) => (
-                <View key={item.productId} style={styles.saleItem}>
+                <View
+                  key={item.productId}
+                  style={[
+                    styles.saleItem,
+                    { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+                  ]}
+                >
                   <View style={styles.saleItemContent}>
-                    <Text style={styles.saleItemName}>{item.productName}</Text>
+                    <Text style={[styles.saleItemName, { color: theme.colors.text }]}>
+                      {item.productName}
+                    </Text>
                     <View style={styles.quantityControls}>
                       <TouchableOpacity
                         onPress={() =>
                           updateQuantity(item.productId, item.quantity - 1)
                         }
-                        style={styles.quantityButton}
+                        style={[
+                          styles.quantityButton,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.border,
+                          },
+                        ]}
                       >
                         <Text style={styles.quantityButtonText}>-</Text>
                       </TouchableOpacity>
-                      <Text style={styles.quantityText}>{item.quantity}</Text>
+                      <Text style={[styles.quantityText, { color: theme.colors.text }]}>
+                        {item.quantity}
+                      </Text>
                       <TouchableOpacity
                         onPress={() =>
                           updateQuantity(item.productId, item.quantity + 1)
                         }
-                        style={styles.quantityButton}
+                        style={[
+                          styles.quantityButton,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.border,
+                          },
+                        ]}
                       >
                         <Text style={styles.quantityButtonText}>+</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                  <Text style={styles.saleItemPrice}>
-                    TL {item.total.toLocaleString('tr-TR')}
+                  <Text style={[styles.saleItemPrice, { color: theme.colors.text }]}>
+                    TL {(item.quantity * item.unitPrice).toLocaleString('tr-TR')}
                   </Text>
                 </View>
               ))}
 
               <TouchableOpacity
-                style={styles.addProductButton}
+                style={[styles.addProductButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.primary }]}
                 onPress={() => setShowProductPicker(true)}
               >
-                <Plus size={20} color="#3b82f6" />
-                <Text style={styles.addProductText}>Urun Ekle</Text>
+                <Plus size={20} color={theme.colors.primary} />
+                <Text style={[styles.addProductText, { color: theme.colors.primary }]}>Urun Ekle</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.totalSection}>
-              <Text style={styles.totalLabel}>Toplam</Text>
-              <Text style={styles.totalAmount}>
+            <View style={[styles.totalSection, { backgroundColor: theme.colors.surfaceMuted }]}>
+              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Toplam</Text>
+              <Text style={[styles.totalAmount, { color: theme.colors.text }]}>
                 TL {getTotalAmount().toLocaleString('tr-TR')}
               </Text>
             </View>
           </ScrollView>
 
-          <View style={styles.modalFooter}>
+          <View style={[styles.modalFooter, { borderTopColor: theme.colors.border }]}>
             <TouchableOpacity
-              style={[styles.createButton, saving && styles.buttonDisabled]}
+              style={[styles.createButton, { backgroundColor: theme.colors.primary }, saving && styles.buttonDisabled]}
               onPress={handleCreateSale}
               disabled={saving}
             >
@@ -561,11 +497,11 @@ export default function Sales() {
 
         <Modal visible={showCustomerPicker} animationType="slide" transparent>
           <View style={styles.pickerModal}>
-            <View style={styles.pickerContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Musteri Secin</Text>
+            <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Musteri Secin</Text>
                 <TouchableOpacity onPress={() => setShowCustomerPicker(false)}>
-                  <X size={24} color="#64748b" />
+                  <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -573,15 +509,17 @@ export default function Sales() {
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={styles.pickerItem}
+                    style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                     onPress={() => {
                       setSelectedCustomer(item.id);
                       setShowCustomerPicker(false);
                     }}
                   >
-                    <Text style={styles.pickerItemText}>{item.name}</Text>
+                    <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
+                      {item.name}
+                    </Text>
                     {selectedCustomer === item.id ? (
-                      <Check size={20} color="#3b82f6" />
+                      <Check size={20} color={theme.colors.primary} />
                     ) : null}
                   </TouchableOpacity>
                 )}
@@ -592,11 +530,11 @@ export default function Sales() {
 
         <Modal visible={showProductPicker} animationType="slide" transparent>
           <View style={styles.pickerModal}>
-            <View style={styles.pickerContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Urun Secin</Text>
+            <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Urun Secin</Text>
                 <TouchableOpacity onPress={() => setShowProductPicker(false)}>
-                  <X size={24} color="#64748b" />
+                  <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
               </View>
               <FlatList
@@ -604,16 +542,18 @@ export default function Sales() {
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => (
                   <TouchableOpacity
-                    style={styles.pickerItem}
+                    style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                     onPress={() => addProduct(item)}
                   >
                     <View>
-                      <Text style={styles.pickerItemText}>{item.name}</Text>
-                      <Text style={styles.pickerItemDetail}>
+                      <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.pickerItemDetail, { color: theme.colors.textMuted }]}>
                         Stok: {item.stock_quantity} {item.unit}
                       </Text>
                     </View>
-                    <Text style={styles.pickerItemPrice}>
+                    <Text style={[styles.pickerItemPrice, { color: theme.colors.text }]}>
                       TL {Number(item.sale_price).toLocaleString('tr-TR')}
                     </Text>
                   </TouchableOpacity>
@@ -659,14 +599,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   listItem: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   itemContent: {
     flex: 1,
@@ -674,23 +612,19 @@ const styles = StyleSheet.create({
   itemCustomerLarge: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 6,
   },
   itemDate: {
     fontSize: 12,
-    color: '#94a3b8',
     marginBottom: 6,
   },
   itemProductNames: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#334155',
     marginBottom: 4,
   },
   itemDetails: {
     fontSize: 13,
-    color: '#64748b',
   },
   itemRight: {
     alignItems: 'flex-end',
@@ -699,7 +633,6 @@ const styles = StyleSheet.create({
   itemAmount: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 8,
   },
   deleteButton: {
@@ -726,7 +659,6 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -735,33 +667,27 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0f172a',
   },
   modalContent: {
     flex: 1,
     padding: 24,
   },
   pickerButton: {
-    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
   },
   pickerLabel: {
     fontSize: 12,
-    color: '#64748b',
     marginBottom: 4,
   },
   pickerValue: {
     fontSize: 16,
-    color: '#0f172a',
     fontWeight: '600',
   },
   section: {
@@ -770,14 +696,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
     marginBottom: 12,
   },
   saleItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f8fafc',
+    borderWidth: 1,
     borderRadius: 8,
     marginBottom: 8,
   },
@@ -787,7 +712,6 @@ const styles = StyleSheet.create({
   saleItemName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 8,
   },
   quantityControls: {
@@ -799,9 +723,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -813,23 +735,19 @@ const styles = StyleSheet.create({
   quantityText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
     minWidth: 30,
     textAlign: 'center',
   },
   saleItemPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
   },
   addProductButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
-    backgroundColor: '#f8fafc',
     borderWidth: 2,
-    borderColor: '#3b82f6',
     borderRadius: 12,
     borderStyle: 'dashed',
     gap: 8,
@@ -837,25 +755,21 @@ const styles = StyleSheet.create({
   addProductText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3b82f6',
   },
   totalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8fafc',
     borderRadius: 12,
   },
   totalLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#64748b',
   },
   totalAmount: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0f172a',
   },
   modalFooter: {
     padding: 24,
@@ -863,7 +777,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#e2e8f0',
   },
   createButton: {
-    backgroundColor: '#3b82f6',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -882,7 +795,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   pickerContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
@@ -893,21 +805,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
   },
   pickerItemText: {
     fontSize: 16,
-    color: '#0f172a',
     fontWeight: '600',
   },
   pickerItemDetail: {
     fontSize: 14,
-    color: '#64748b',
     marginTop: 4,
   },
   pickerItemPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0f172a',
   },
 });
