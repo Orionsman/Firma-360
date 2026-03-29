@@ -1,5 +1,5 @@
-import React, { createContext, ReactNode, useContext, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppTheme, ThemeMode, themes } from '@/lib/theme';
 
 interface ThemeContextType {
@@ -9,12 +9,33 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const THEME_MODE_STORAGE_KEY = 'cepte_cari_theme_mode';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const deviceScheme = useColorScheme();
-  const [manualMode, setManualMode] = useState<ThemeMode | null>(null);
+  const [manualMode, setManualMode] = useState<ThemeMode>('light');
 
-  const mode = manualMode ?? (deviceScheme === 'dark' ? 'dark' : 'light');
+  useEffect(() => {
+    let mounted = true;
+
+    const loadThemeMode = async () => {
+      try {
+        const storedMode = await AsyncStorage.getItem(THEME_MODE_STORAGE_KEY);
+        if (mounted && (storedMode === 'light' || storedMode === 'dark')) {
+          setManualMode(storedMode);
+        }
+      } catch {
+        // Fall back to default light mode when storage is unavailable.
+      }
+    };
+
+    void loadThemeMode();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const mode = manualMode;
   const theme = useMemo(() => themes[mode], [mode]);
 
   const value = useMemo(
@@ -23,11 +44,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       theme,
       toggleTheme: () =>
         setManualMode((current) => {
-          const currentMode = current ?? (deviceScheme === 'dark' ? 'dark' : 'light');
-          return currentMode === 'dark' ? 'light' : 'dark';
+          const nextMode = current === 'dark' ? 'light' : 'dark';
+          void AsyncStorage.setItem(THEME_MODE_STORAGE_KEY, nextMode);
+          return nextMode;
         }),
     }),
-    [deviceScheme, mode, theme]
+    [mode, theme]
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

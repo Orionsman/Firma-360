@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Building2,
   FileLock2,
@@ -24,7 +23,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
-import { FirmaLogo } from '@/components/FirmaLogo';
+import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { typography } from '@/lib/typography';
 
 export default function SettingsScreen() {
   const { company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
@@ -51,12 +51,12 @@ export default function SettingsScreen() {
 
   const handleSaveCompany = async () => {
     if (!company) {
-      Alert.alert('Bilgi', 'Duzenlenecek firma bulunamadi.');
+      Alert.alert('Bilgi', 'Düzenlenecek firma bulunamadı.');
       return;
     }
 
     if (!companyName.trim()) {
-      Alert.alert('Hata', 'Firma adi bos olamaz.');
+      Alert.alert('Hata', 'Firma adı boş olamaz.');
       return;
     }
 
@@ -79,7 +79,7 @@ export default function SettingsScreen() {
 
       await refreshCompany();
       setShowCompanyEditor(false);
-      Alert.alert('Basarili', 'Firma bilgileri guncellendi.');
+      Alert.alert('Başarılı', 'Firma bilgileri güncellendi.');
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
@@ -92,7 +92,7 @@ export default function SettingsScreen() {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Hata', 'Yeni sifre en az 6 karakter olmali.');
+      Alert.alert('Hata', 'Yeni şifre en az 6 karakter olmalı.');
       return;
     }
 
@@ -107,11 +107,11 @@ export default function SettingsScreen() {
       }
 
       setNewPassword('');
-      Alert.alert('Basarili', 'Sifreniz guncellendi.');
+      Alert.alert('Başarılı', 'Şifreniz güncellendi.');
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Sifre degistirilemedi.'
+        error instanceof Error ? error.message : 'Şifre değiştirilemedi.'
       );
     } finally {
       setSavingPassword(false);
@@ -125,27 +125,27 @@ export default function SettingsScreen() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Cikis yapilamadi.'
+        error instanceof Error ? error.message : 'Çıkış yapılamadı.'
       );
     }
   };
 
   const handleRequestAccountDeletion = () => {
     Alert.alert(
-      'Hesap silme talebi gonderilsin mi?',
-      'Bu islem silme talebinizi kaydeder. Talep arka planda islenecektir ve yasal saklama zorunlulugu olmayan veriler silinir veya anonimlestirilir.',
+      'Hesap silme talebi gönderilsin mi?',
+      'Bu işlem silme talebinizi kaydeder. Talep arka planda işlenecektir ve yasal saklama zorunluluğu olmayan veriler silinir veya anonimleştirilir.',
       [
-        { text: 'Vazgec', style: 'cancel' },
+        { text: 'Vazgeç', style: 'cancel' },
         {
-          text: 'Talep Gonder',
+          text: 'Talep Gönder',
           onPress: async () => {
             setRequestingDeletion(true);
             try {
               await requestAccountDeletion(deletionReason);
               setDeletionReason('');
               Alert.alert(
-                'Talep Alindi',
-                'Hesap silme talebiniz kaydedildi. Islem arka planda tamamlanacaktir.'
+                'Talep Alındı',
+                'Hesap silme talebiniz kaydedildi. İşlem arka planda tamamlanacaktır.'
               );
             } catch (error: unknown) {
               Alert.alert(
@@ -166,17 +166,11 @@ export default function SettingsScreen() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={styles.content}
     >
-      <LinearGradient
-        colors={[theme.colors.primaryStrong, theme.colors.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+      <BrandHeroHeader
+        kicker="HESAP VE GÖRÜNÜM"
+        title="Ayarlar"
+        subtitle="Hesabını, firma bilgilerini ve deneyimini tek yerden yönet."
       >
-        <FirmaLogo size="sm" />
-        <Text style={styles.title}>Ayarlar</Text>
-        <Text style={styles.subtitle}>
-          CepteCari hesabini, firma bilgilerini ve gorunumu yonetin.
-        </Text>
         <TouchableOpacity
           style={[
             styles.themeToggle,
@@ -194,10 +188,10 @@ export default function SettingsScreen() {
             <MoonStar size={18} color={theme.colors.primary} />
           )}
           <Text style={styles.themeToggleText}>
-            {mode === 'dark' ? 'Acik moda gec' : 'Koyu moda gec'}
+            {mode === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
           </Text>
         </TouchableOpacity>
-      </LinearGradient>
+      </BrandHeroHeader>
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
@@ -209,13 +203,13 @@ export default function SettingsScreen() {
           onPress={() => setShowCompanyEditor((current) => !current)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {showCompanyEditor ? 'Firma Bilgilerini Gizle' : 'Firma Bilgilerini Guncelle'}
+            {showCompanyEditor ? 'Firma Bilgilerini Gizle' : 'Firma Bilgilerini Güncelle'}
           </Text>
         </TouchableOpacity>
 
         {showCompanyEditor ? (
           <View style={styles.editorSection}>
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adi</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adı</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={companyName}
@@ -271,10 +265,10 @@ export default function SettingsScreen() {
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
           <KeyRound size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Sifre Degistir</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Şifre Değiştir</Text>
         </View>
 
-        <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Sifre</Text>
+        <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Şifre</Text>
         <TextInput
           style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
           value={newPassword}
@@ -291,7 +285,7 @@ export default function SettingsScreen() {
         >
           <KeyRound size={18} color="#ffffff" />
           <Text style={styles.primaryButtonText}>
-            {savingPassword ? 'Guncelleniyor...' : 'Sifreyi Guncelle'}
+            {savingPassword ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -302,9 +296,9 @@ export default function SettingsScreen() {
           <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Hakkimizda</Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          CepteCari ile borc ve alacak takibini kolayca yonetin. Esnaflar ve
-          bireysel kullanicilar icin gelistirilen bu pratik uygulama sayesinde
-          tum hesaplariniz artik cebinizde.
+          CepteCari ile borç ve alacak takibini kolayca yönetin. Esnaflar ve
+          bireysel kullanıcılar için geliştirilen bu pratik uygulama sayesinde
+          tüm hesaplarınız artık cebinizde.
         </Text>
 
         <TouchableOpacity
@@ -312,7 +306,7 @@ export default function SettingsScreen() {
           onPress={() => router.push('/privacy-policy' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            Gizlilik Politikasini Ac
+            Gizlilik Politikasını Aç
           </Text>
         </TouchableOpacity>
 
@@ -321,7 +315,7 @@ export default function SettingsScreen() {
           onPress={() => router.push('/account-deletion' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            Hesap Silme Bilgilerini Ac
+            Hesap Silme Bilgilerini Aç
           </Text>
         </TouchableOpacity>
       </View>
@@ -335,8 +329,8 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={[styles.dangerText, { color: theme.colors.danger }]}>
-          Buradan hesap silme talebi olusturabilirsiniz. Talep kaydedildikten
-          sonra backend tarafinda islenir ve geri donulemeyebilir.
+          Buradan hesap silme talebi oluşturabilirsiniz. Talep kaydedildikten
+          sonra backend tarafında işlenir ve geri dönülemeyebilir.
         </Text>
 
         <Text style={[styles.label, { color: theme.colors.textMuted }]}>
@@ -348,15 +342,15 @@ export default function SettingsScreen() {
           onChangeText={setDeletionReason}
           multiline
           numberOfLines={4}
-          placeholder="Talebinizle ilgili kisa bir not yazabilirsiniz."
+          placeholder="Talebinizle ilgili kısa bir not yazabilirsiniz."
           placeholderTextColor={theme.colors.textSoft}
         />
 
         <View style={styles.inlineInfo}>
           <FileLock2 size={16} color={theme.colors.danger} />
           <Text style={[styles.inlineInfoText, { color: theme.colors.danger }]}>
-            Islem tamamlandiginda size ait hesap verileri silinir veya
-            anonimlestirilir.
+            İşlem tamamlandığında size ait hesap verileri silinir veya
+            anonimleştirilir.
           </Text>
         </View>
 
@@ -367,7 +361,7 @@ export default function SettingsScreen() {
         >
           <Trash2 size={18} color="#ffffff" />
           <Text style={styles.dangerButtonText}>
-            {requestingDeletion ? 'Talep Gonderiliyor...' : 'Hesap Silme Talebi Gonder'}
+            {requestingDeletion ? 'Talep Gönderiliyor...' : 'Hesap Silme Talebi Gönder'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -377,7 +371,7 @@ export default function SettingsScreen() {
         onPress={handleSignOut}
       >
         <LogOut size={18} color="#ffffff" />
-        <Text style={styles.logoutButtonText}>Cikis Yap</Text>
+        <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -394,27 +388,75 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
-    alignItems: 'center',
+    alignItems: 'stretch',
     paddingTop: 56,
-    paddingBottom: 24,
+    paddingBottom: 26,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    borderBottomLeftRadius: 34,
+    borderBottomRightRadius: 34,
+    overflow: 'hidden',
+  },
+  headerOrbOne: {
+    position: 'absolute',
+    top: -34,
+    right: -18,
+    width: 168,
+    height: 168,
+    borderRadius: 84,
+    backgroundColor: 'rgba(255,255,255,0.11)',
+  },
+  headerOrbTwo: {
+    position: 'absolute',
+    bottom: -52,
+    left: -28,
+    width: 138,
+    height: 138,
+    borderRadius: 69,
+    backgroundColor: 'rgba(34,228,214,0.12)',
+  },
+  headerBrandCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 18,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
+  headerLogoShell: {
+    width: 84,
+    height: 84,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTextBlock: {
+    flex: 1,
+  },
+  headerKicker: {
+    ...typography.label,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
+    ...typography.hero,
+    fontSize: 30,
     marginBottom: 6,
-    marginTop: 14,
     color: '#ffffff',
   },
   subtitle: {
+    ...typography.body,
     fontSize: 14,
-    textAlign: 'center',
     color: 'rgba(255,255,255,0.82)',
+    lineHeight: 21,
   },
   themeToggle: {
     marginTop: 16,
+    alignSelf: 'flex-start',
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 16,
@@ -424,8 +466,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   themeToggleText: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '700',
     color: '#ffffff',
   },
   card: {
@@ -441,12 +483,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: {
+    ...typography.heading,
     fontSize: 18,
-    fontWeight: '700',
   },
   label: {
+    ...typography.label,
     fontSize: 13,
-    fontWeight: '600',
     marginBottom: 8,
     marginTop: 8,
   },
@@ -473,9 +515,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -488,13 +530,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   secondaryButtonText: {
+    ...typography.heading,
     fontSize: 15,
-    fontWeight: '700',
   },
   secondaryButtonSpacing: {
     marginTop: 10,
   },
   aboutText: {
+    ...typography.body,
     fontSize: 14,
     lineHeight: 22,
     marginBottom: 16,
@@ -506,10 +549,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dangerCardTitle: {
+    ...typography.heading,
     fontSize: 18,
-    fontWeight: '700',
   },
   dangerText: {
+    ...typography.body,
     fontSize: 14,
     lineHeight: 22,
     marginBottom: 12,
@@ -521,6 +565,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   inlineInfoText: {
+    ...typography.caption,
     flex: 1,
     fontSize: 13,
     lineHeight: 20,
@@ -535,9 +580,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dangerButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
   },
   logoutButton: {
     marginTop: 8,
@@ -549,8 +594,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 15,
-    fontWeight: '700',
   },
 });

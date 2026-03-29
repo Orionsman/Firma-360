@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
@@ -15,6 +14,7 @@ function AppNavigator() {
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="reports" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="account-deletion" />
         <Stack.Screen name="+not-found" />

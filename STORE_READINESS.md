@@ -12,7 +12,7 @@ Manual work still required before submission:
 
 - replace placeholder support contact details in `docs/privacy-policy.md`
 - publish the privacy policy and account deletion pages at public HTTPS URLs
-- verify `com.firma360.mobile` is the final unique bundle/package identifier you want to keep
+- verify `com.ceptecari.mobile` is the final unique bundle/package identifier you want to keep
 - create store listings, screenshots, descriptions, and final branded assets
 - run Supabase migration deployment in the target project
 

@@ -3,6 +3,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -23,6 +24,11 @@ import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
+import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { DateField } from '@/components/DateField';
+import { formatSignedTRY, formatTRY } from '@/lib/format';
+import { typography } from '@/lib/typography';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Payment {
   id: string;
@@ -50,6 +56,9 @@ interface Supplier {
 export default function Payments() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const modalBottomSpacing =
+    Math.max(insets.bottom, Platform.OS === 'android' ? 34 : 20) + 24;
   const [payments, setPayments] = useState<Payment[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -72,7 +81,7 @@ export default function Payments() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
+        'Önce ana sayfadaki firma kurulum kartından firmanızı oluşturmanız gerekiyor.'
       );
       return false;
     }
@@ -80,7 +89,7 @@ export default function Payments() {
     return true;
   };
 
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     if (!company) {
       setPayments([]);
       return;
@@ -98,9 +107,9 @@ export default function Payments() {
     }
 
     setPayments((data as Payment[]) ?? []);
-  };
+  }, [company]);
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     if (!company) {
       setCustomers([]);
       return;
@@ -112,9 +121,9 @@ export default function Payments() {
       .eq('company_id', company.id);
 
     setCustomers(data ?? []);
-  };
+  }, [company]);
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     if (!company) {
       setSuppliers([]);
       return;
@@ -126,18 +135,16 @@ export default function Payments() {
       .eq('company_id', company.id);
 
     setSuppliers(data ?? []);
-  };
+  }, [company]);
 
   useEffect(() => {
-    fetchPayments();
-    fetchCustomers();
-    fetchSuppliers();
-  }, [company]);
+    void Promise.all([fetchPayments(), fetchCustomers(), fetchSuppliers()]);
+  }, [fetchCustomers, fetchPayments, fetchSuppliers]);
 
   useFocusEffect(
     useCallback(() => {
       void Promise.all([fetchPayments(), fetchCustomers(), fetchSuppliers()]);
-    }, [company])
+    }, [fetchCustomers, fetchPayments, fetchSuppliers])
   );
 
   const onRefresh = async () => {
@@ -148,13 +155,13 @@ export default function Payments() {
 
   const handleAddPayment = async () => {
     if (!formData.amount.trim()) {
-      Alert.alert('Hata', 'Lutfen tutar girin.');
+      Alert.alert('Hata', 'Lütfen tutar girin.');
       return;
     }
 
     const parsedAmount = parseFloat(formData.amount);
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Hata', 'Gecerli bir tutar girin.');
+      Alert.alert('Hata', 'Geçerli bir tutar girin.');
       return;
     }
 
@@ -197,7 +204,7 @@ export default function Payments() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Odeme kaydedilemedi.'
+        error instanceof Error ? error.message : 'Ödeme kaydedilemedi.'
       );
     } finally {
       setSaving(false);
@@ -225,7 +232,7 @@ export default function Payments() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Odeme silinemedi.'
+        error instanceof Error ? error.message : 'Ödeme silinemedi.'
       );
     } finally {
       setDeletingId(null);
@@ -249,15 +256,15 @@ export default function Payments() {
 
   const getRelatedParty = (payment: Payment) =>
     payment.payment_type === 'income'
-      ? payment.customers?.name || 'Musteri yok'
-      : payment.suppliers?.name || 'Tedarikci yok';
+      ? payment.customers?.name || 'Müşteri yok'
+      : payment.suppliers?.name || 'Tedarikçi yok';
 
   const getPaymentMethodText = (method: string) => {
     const methods: Record<string, string> = {
       cash: 'Nakit',
       bank_transfer: 'Banka transferi',
-      credit_card: 'Kredi karti',
-      check: 'Cek',
+      credit_card: 'Kredi kartı',
+      check: 'Çek',
     };
 
     return methods[method] || method;
@@ -312,8 +319,9 @@ export default function Payments() {
               : styles.expenseAmount,
           ]}
         >
-          {item.payment_type === 'income' ? '+' : '-'}TL{' '}
-          {Number(item.amount).toLocaleString('tr-TR')}
+          {formatSignedTRY(
+            item.payment_type === 'income' ? item.amount : -Number(item.amount)
+          )}
         </Text>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -330,20 +338,28 @@ export default function Payments() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Odemeler</Text>
-        <TouchableOpacity
-          onPress={() => {
-            if (!ensureCompany()) {
-              return;
-            }
-            setModalVisible(true);
-          }}
-          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-        >
-          <Plus size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
+      <BrandHeroHeader
+        kicker="NAKİT AKIŞI"
+        brandSubtitle="Gelir ve gider hareketlerini güncel tutun."
+        rightAccessory={
+          <TouchableOpacity
+            onPress={() => {
+              if (!ensureCompany()) {
+                return;
+              }
+              setModalVisible(true);
+            }}
+            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+          >
+            <View style={styles.addPaymentIcon}>
+              <Wallet size={20} color="#ffffff" />
+              <View style={styles.addBadge}>
+                <Plus size={12} color={theme.colors.primary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+        }
+      />
 
       <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity
@@ -375,7 +391,7 @@ export default function Payments() {
               activeTab === 'income' ? styles.incomeAmount : styles.expenseAmount,
             ]}
           >
-            TL {getTotalAmount(activeTab).toLocaleString('tr-TR')}
+            {formatTRY(getTotalAmount(activeTab))}
           </Text>
         </View>
       </View>
@@ -392,7 +408,7 @@ export default function Payments() {
           <View style={styles.emptyState}>
             <Wallet size={48} color={theme.colors.textSoft} />
             <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
-              Henuz {activeTab === 'income' ? 'gelir' : 'gider'} yok
+              Henüz {activeTab === 'income' ? 'gelir' : 'gider'} yok
             </Text>
           </View>
         }
@@ -410,7 +426,10 @@ export default function Payments() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.form}>
+            <ScrollView
+              contentContainerStyle={[styles.form, { paddingBottom: modalBottomSpacing }]}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: theme.colors.textMuted }]}>Tutar *</Text>
                 <TextInput
@@ -430,28 +449,19 @@ export default function Payments() {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Tarih</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.colors.surfaceMuted,
-                      borderColor: theme.colors.border,
-                      color: theme.colors.text,
-                    },
-                  ]}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme.colors.textSoft}
-                  value={formData.paymentDate}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, paymentDate: text })
-                  }
-                />
-              </View>
+              <DateField
+                label="Tarih"
+                value={formData.paymentDate}
+                onChange={(paymentDate) => setFormData({ ...formData, paymentDate })}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textMuted}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Odeme Yontemi</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ödeme Yöntemi</Text>
                 <TouchableOpacity
                   style={[
                     styles.pickerButton,
@@ -471,7 +481,7 @@ export default function Payments() {
               {relatedParties.length > 0 ? (
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: theme.colors.textMuted }]}>
-                    {activeTab === 'income' ? 'Musteri' : 'Tedarikci'}
+                    {activeTab === 'income' ? 'Müşteri' : 'Tedarikçi'}
                   </Text>
                   <TouchableOpacity
                     style={[
@@ -495,7 +505,7 @@ export default function Payments() {
               ) : null}
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Aciklama</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Açıklama</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -506,7 +516,7 @@ export default function Payments() {
                       color: theme.colors.text,
                     },
                   ]}
-                  placeholder="Aciklama"
+                  placeholder="Açıklama"
                   placeholderTextColor={theme.colors.textSoft}
                   value={formData.description}
                   onChangeText={(text) =>
@@ -530,7 +540,7 @@ export default function Payments() {
                   {saving ? 'Kaydediliyor...' : 'Kaydet'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -539,7 +549,7 @@ export default function Payments() {
         <View style={styles.pickerModal}>
           <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Odeme yontemi secin</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Ödeme yöntemi seçin</Text>
               <TouchableOpacity onPress={() => setShowMethodPicker(false)}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
@@ -548,8 +558,8 @@ export default function Payments() {
               {[
                 { value: 'cash', label: 'Nakit' },
                 { value: 'bank_transfer', label: 'Banka transferi' },
-                { value: 'credit_card', label: 'Kredi karti' },
-                { value: 'check', label: 'Cek' },
+                { value: 'credit_card', label: 'Kredi kartı' },
+                { value: 'check', label: 'Çek' },
               ].map((method) => (
                 <TouchableOpacity
                   key={method.value}
@@ -574,7 +584,7 @@ export default function Payments() {
           <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                {activeTab === 'income' ? 'Musteri' : 'Tedarikci'} secin
+                {activeTab === 'income' ? 'Müşteri' : 'Tedarikçi'} seçin
               </Text>
               <TouchableOpacity onPress={() => setShowPartyPicker(false)}>
                 <X size={24} color={theme.colors.textMuted} />
@@ -628,8 +638,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
+    ...typography.title,
     fontSize: 24,
-    fontWeight: '700',
     color: '#0f172a',
   },
   addButton: {
@@ -637,6 +647,23 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPaymentIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBadge: {
+    position: 'absolute',
+    right: -4,
+    top: -3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -653,8 +680,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   tabText: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
   },
   summaryCard: {
     margin: 16,
@@ -668,12 +695,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryLabel: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
   },
   summaryAmount: {
+    ...typography.hero,
     fontSize: 24,
-    fontWeight: '700',
   },
   incomeAmount: {
     color: '#22c55e',
@@ -704,18 +731,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 4,
   },
   itemDetail: {
+    ...typography.caption,
     fontSize: 13,
   },
   itemDescription: {
+    ...typography.caption,
     fontSize: 13,
     marginTop: 2,
   },
   itemDate: {
+    ...typography.caption,
     fontSize: 12,
     marginTop: 4,
   },
@@ -724,8 +754,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   itemAmount: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '700',
   },
   deleteButton: {
     minWidth: 52,
@@ -735,8 +765,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   deleteText: {
+    ...typography.label,
     fontSize: 12,
-    fontWeight: '700',
     color: '#ef4444',
   },
   emptyState: {
@@ -745,6 +775,7 @@ const styles = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyText: {
+    ...typography.body,
     fontSize: 16,
     color: '#94a3b8',
     marginTop: 16,
@@ -770,8 +801,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
+    ...typography.title,
     fontSize: 20,
-    fontWeight: '700',
   },
   form: {
     paddingHorizontal: 24,
@@ -781,8 +812,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
   },
   input: {
@@ -801,8 +832,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   pickerValue: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '600',
   },
   submitButton: {
     borderRadius: 12,
@@ -814,9 +845,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
   },
   pickerModal: {
     flex: 1,
@@ -833,7 +864,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   pickerItemText: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '600',
   },
 });

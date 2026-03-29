@@ -1,35 +1,38 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { typography } from '@/lib/typography';
 
 const sections = [
   {
     title: 'Toplanan Veriler',
     body:
-      'Hesap bilgileri, firma profili, musteriler, tedarikciler, urunler, satislar, odemeler ve stok hareketleri gibi uygulamaya girdiginiz is verileri saklanir.',
+      'Hesap bilgileri, firma profili, müşteriler, tedarikçiler, ürünler, satışlar, ödemeler ve stok hareketleri gibi uygulamaya girdiğiniz iş verileri saklanır.',
   },
   {
     title: 'Verilerin Kullanimi',
     body:
-      'Bu veriler hesabinizi yonetmek, firma kayitlarini senkronize etmek, guvenligi saglamak ve destek sunmak icin kullanilir.',
+      'Bu veriler hesabınızı yönetmek, firma kayıtlarını senkronize etmek, güvenliği sağlamak ve destek sunmak için kullanılır.',
   },
   {
     title: 'Veri Saklama',
     body:
-      'Hesabiniz aktif oldugu surece veriler saklanir. Hesap silme talebi olusturuldugunda, yasal veya finansal saklama zorunlulugu bulunmayan veriler silinir veya anonimlestirilir.',
+      'Hesabınız aktif olduğu sürece veriler saklanır. Hesap silme talebi oluşturulduğunda, yasal veya finansal saklama zorunluluğu bulunmayan veriler silinir veya anonimleştirilir.',
   },
   {
     title: 'Veri Paylasimi',
     body:
-      'Veriler satilmaz. Yalnizca uygulamayi calistirmak icin gerekli altyapi ve servis saglayicilarla paylasilir.',
+      'Veriler satılmaz. Yalnızca uygulamayı çalıştırmak için gerekli altyapı ve servis sağlayıcılarla paylaşılır.',
   },
 ];
 
 export default function PrivacyPolicyScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Gizlilik Politikasi</Text>
-        <Text style={styles.subtitle}>Son guncelleme: 27 Mart 2026</Text>
-      </View>
+      <BrandHeroHeader
+        kicker="YASAL BİLGİLENDİRME"
+        title="Gizlilik Politikası"
+        subtitle="Son güncelleme: 27 Mart 2026"
+      />
 
       {sections.map((section) => (
         <View key={section.title} style={styles.card}>
@@ -39,10 +42,10 @@ export default function PrivacyPolicyScreen() {
       ))}
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Yayin Notu</Text>
+        <Text style={styles.noteTitle}>Yayın Notu</Text>
         <Text style={styles.noteText}>
-          Store gonderimi oncesinde bu icerigin genel erisime acik bir HTTPS sayfasinda
-          yayinlanmasi gerekir. Kaynak metin docs/privacy-policy.md dosyasinda bulunur.
+          Store gönderimi öncesinde bu içeriğin genel erişime açık bir HTTPS sayfasında
+          yayınlanması gerekir. Kaynak metin `docs/privacy-policy.md` dosyasında bulunur.
         </Text>
       </View>
     </ScrollView>
@@ -63,12 +66,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
+    ...typography.title,
     fontSize: 28,
-    fontWeight: '700',
     color: '#0f172a',
     marginBottom: 6,
   },
   subtitle: {
+    ...typography.caption,
     fontSize: 14,
     color: '#64748b',
   },
@@ -81,12 +85,13 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   cardTitle: {
+    ...typography.heading,
     fontSize: 18,
-    fontWeight: '700',
     color: '#0f172a',
     marginBottom: 8,
   },
   cardBody: {
+    ...typography.body,
     fontSize: 15,
     lineHeight: 24,
     color: '#475569',
@@ -100,12 +105,13 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   noteTitle: {
+    ...typography.heading,
     fontSize: 17,
-    fontWeight: '700',
     color: '#1d4ed8',
     marginBottom: 8,
   },
   noteText: {
+    ...typography.body,
     fontSize: 14,
     lineHeight: 22,
     color: '#1e3a8a',

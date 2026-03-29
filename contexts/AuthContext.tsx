@@ -50,19 +50,19 @@ const getReadableAuthError = (error: unknown) => {
           'message' in error &&
           typeof (error as { message?: unknown }).message === 'string'
         ? (error as { message: string }).message
-        : 'Beklenmeyen bir hata olustu.';
+        : 'Beklenmeyen bir hata oluştu.';
   const lowered = message.toLowerCase();
 
   if (lowered.includes('email rate limit exceeded')) {
-    return 'Cok fazla deneme yapildi. Lutfen 1-2 dakika bekleyip tekrar deneyin.';
+    return 'Çok fazla deneme yapıldı. Lütfen 1-2 dakika bekleyip tekrar deneyin.';
   }
 
   if (lowered.includes('invalid login credentials')) {
-    return 'E-posta veya sifre hatali.';
+    return 'E-posta veya şifre hatalı.';
   }
 
   if (lowered.includes('email not confirmed')) {
-    return 'E-posta adresinizi dogrulamaniz gerekiyor.';
+    return 'E-posta adresinizi doğrulamanız gerekiyor.';
   }
 
   if (
@@ -72,14 +72,14 @@ const getReadableAuthError = (error: unknown) => {
     lowered.includes('forbidden') ||
     lowered.includes('403')
   ) {
-    return 'Supabase yetki ayari nedeniyle islem tamamlanamadi. SQL policy ayarlari duzeltilmeli veya kullaniciya SQL Editor uzerinden firma baglanmali.';
+    return 'Supabase yetki ayarı nedeniyle işlem tamamlanamadı. SQL policy ayarları düzeltilmeli veya kullanıcıya SQL Editor üzerinden firma bağlanmalı.';
   }
 
   if (
     lowered.includes('schema cache') ||
-    lowered.includes('function') && lowered.includes('not found')
+    (lowered.includes('function') && lowered.includes('not found'))
   ) {
-    return 'Supabase fonksiyonu bulunamadi. Migration SQL dosyalari veritabanina uygulanmamis olabilir.';
+    return 'Supabase fonksiyonu bulunamadı. Migration SQL dosyaları veritabanına uygulanmamış olabilir.';
   }
 
   return message;
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!authData.user) {
-      throw new Error('Kayit basarisiz.');
+      throw new Error('Kayıt başarısız.');
     }
 
     if (!authData.session) {
@@ -191,12 +191,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resolvedUserId = getUserId(overrideUserId, user);
 
     if (!resolvedUserId) {
-      throw new Error('Oturum bulunamadi. Lutfen yeniden giris yapin.');
+      throw new Error('Oturum bulunamadı. Lütfen yeniden giriş yapın.');
     }
 
     const trimmedName = companyName.trim();
     if (!trimmedName) {
-      throw new Error('Firma adi bos olamaz.');
+      throw new Error('Firma adı boş olamaz.');
     }
 
     const { data: existingMembership, error: membershipError } = await supabase

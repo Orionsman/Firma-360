@@ -4,6 +4,7 @@ import {
   FlatList,
   ListRenderItem,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -14,11 +15,13 @@ import {
 } from 'react-native';
 import { UserPlus, X, User, TrendingUp, TrendingDown, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
-import { FirmaLogo } from '@/components/FirmaLogo';
+import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { formatSignedTRY, formatTRY } from '@/lib/format';
+import { typography } from '@/lib/typography';
 
 interface Customer {
   id: string;
@@ -45,6 +48,7 @@ interface AccountMovement {
   amount: number;
   date: string;
   type: 'sale' | 'payment';
+  runningBalance?: number;
 }
 
 interface BalanceRow {
@@ -58,7 +62,7 @@ interface SaleMovementRow {
   id: string;
   sale_date: string;
   total_amount: number;
-  sale_items?: Array<{
+  sale_items?: {
     quantity: number;
     unit_price: number;
     total_price: number;
@@ -66,12 +70,15 @@ interface SaleMovementRow {
       name?: string;
       unit?: string;
     } | null;
-  }>;
+  }[];
 }
 
 export default function Customers() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const modalBottomSpacing =
+    Math.max(insets.bottom, Platform.OS === 'android' ? 34 : 20) + 24;
   const [activeTab, setActiveTab] = useState<'customers' | 'suppliers'>(
     'customers'
   );
@@ -86,6 +93,7 @@ export default function Customers() {
     null
   );
   const [movements, setMovements] = useState<AccountMovement[]>([]);
+  const [movementFilter, setMovementFilter] = useState<'all' | 'sale' | 'payment'>('all');
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -98,7 +106,7 @@ export default function Customers() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
+        'Önce ana sayfadaki firma kurulum kartından firmanızı oluşturmanız gerekiyor.'
       );
       return false;
     }
@@ -106,7 +114,7 @@ export default function Customers() {
     return true;
   };
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     if (!company) {
       setCustomers([]);
       return;
@@ -181,9 +189,9 @@ export default function Customers() {
     );
 
     setCustomers(normalizedCustomers);
-  };
+  }, [company]);
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     if (!company) {
       setSuppliers([]);
       return;
@@ -234,16 +242,16 @@ export default function Customers() {
     );
 
     setSuppliers(normalizedSuppliers);
-  };
+  }, [company]);
 
   useEffect(() => {
     void Promise.all([fetchCustomers(), fetchSuppliers()]);
-  }, [company]);
+  }, [fetchCustomers, fetchSuppliers]);
 
   useFocusEffect(
     useCallback(() => {
       void Promise.all([fetchCustomers(), fetchSuppliers()]);
-    }, [company])
+    }, [fetchCustomers, fetchSuppliers])
   );
 
   const onRefresh = async () => {
@@ -263,7 +271,7 @@ export default function Customers() {
 
   const handleAdd = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Hata', 'Lutfen isim girin.');
+      Alert.alert('Hata', 'Lütfen isim girin.');
       return;
     }
 
@@ -292,7 +300,7 @@ export default function Customers() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Kayit sirasinda hata olustu.'
+        error instanceof Error ? error.message : 'Kayıt sırasında hata oluştu.'
       );
     } finally {
       setSaving(false);
@@ -331,7 +339,7 @@ export default function Customers() {
           saleItems
             .map((item) => item.products?.name)
             .filter(Boolean)
-            .join(', ') || 'Satis';
+            .join(', ') || 'Satış';
 
         const subtitle =
           saleItems
@@ -343,7 +351,7 @@ export default function Customers() {
 
               return `${quantity}${unit} x ${unitPrice.toLocaleString('tr-TR')} = ${totalPrice.toLocaleString('tr-TR')}`;
             })
-            .join(' | ') || 'Satis';
+            .join(' | ') || 'Satış';
 
         return {
           id: `sale-${sale.id}`,
@@ -358,16 +366,27 @@ export default function Customers() {
     const paymentMovements: AccountMovement[] =
       paymentsResult.data?.map((payment) => ({
         id: `payment-${payment.id}`,
-        title: 'Odeme',
+        title: 'Ödeme',
         subtitle: payment.payment_method,
         amount: -Number(payment.amount),
         date: payment.payment_date,
         type: 'payment',
       })) ?? [];
 
-    return [...saleMovements, ...paymentMovements].sort((a, b) =>
-      b.date.localeCompare(a.date)
+    const orderedMovements = [...saleMovements, ...paymentMovements].sort((a, b) =>
+      a.date.localeCompare(b.date)
     );
+
+    let runningBalance = 0;
+    const movementsWithBalance = orderedMovements.map((movement) => {
+      runningBalance += movement.amount;
+      return {
+        ...movement,
+        runningBalance,
+      };
+    });
+
+    return movementsWithBalance.sort((a, b) => b.date.localeCompare(a.date));
   };
 
   const fetchSupplierMovements = async (supplierId: string) => {
@@ -382,16 +401,28 @@ export default function Customers() {
       throw error;
     }
 
-    return (
+    const orderedMovements =
       data?.map((payment) => ({
         id: `payment-${payment.id}`,
-        title: 'Odeme',
+        title: 'Ödeme',
         subtitle: payment.payment_method,
         amount: -Number(payment.amount),
         date: payment.payment_date,
         type: 'payment' as const,
-      })) ?? []
-    );
+      })) ?? [];
+
+    let runningBalance = 0;
+    const movementsWithBalance = orderedMovements
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((movement) => {
+        runningBalance += movement.amount;
+        return {
+          ...movement,
+          runningBalance,
+        };
+      });
+
+    return movementsWithBalance.sort((a, b) => b.date.localeCompare(a.date));
   };
 
   const openDetails = async (record: Customer | Supplier) => {
@@ -403,11 +434,12 @@ export default function Customers() {
 
       setSelectedRecord(record);
       setMovements(nextMovements);
+      setMovementFilter('all');
       setDetailVisible(true);
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Hareketler yuklenemedi.'
+        error instanceof Error ? error.message : 'Hareketler yüklenemedi.'
       );
     }
   };
@@ -423,6 +455,59 @@ export default function Customers() {
       Alert.alert(
         'Silme engellendi',
         'Bakiyesi olan bir cari silinemez.'
+      );
+      return;
+    }
+
+    try {
+      if (isCustomer) {
+        const [salesResult, paymentsResult] = await Promise.all([
+          supabase
+            .from('sales')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', company.id)
+            .eq('customer_id', record.id),
+          supabase
+            .from('payments')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', company.id)
+            .eq('customer_id', record.id),
+        ]);
+
+        if (salesResult.error || paymentsResult.error) {
+          throw salesResult.error || paymentsResult.error;
+        }
+
+        if ((salesResult.count || 0) > 0 || (paymentsResult.count || 0) > 0) {
+          Alert.alert(
+            'Silme engellendi',
+            'Hareket geçmişi olan müşteri silinemez.'
+          );
+          return;
+        }
+      } else {
+        const { count, error } = await supabase
+          .from('payments')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', company.id)
+          .eq('supplier_id', record.id);
+
+        if (error) {
+          throw error;
+        }
+
+        if ((count || 0) > 0) {
+          Alert.alert(
+            'Silme engellendi',
+            'Hareket geçmişi olan tedarikçi silinemez.'
+          );
+          return;
+        }
+      }
+    } catch (error: unknown) {
+      Alert.alert(
+        'Hata',
+        error instanceof Error ? error.message : 'Kayıt kontrol edilemedi.'
       );
       return;
     }
@@ -444,7 +529,7 @@ export default function Customers() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Silme islemi basarisiz.'
+        error instanceof Error ? error.message : 'Silme işlemi başarısız.'
       );
     } finally {
       setDeletingId(null);
@@ -473,7 +558,7 @@ export default function Customers() {
             isNegative && styles.balanceNegative,
           ]}
         >
-          TL {Math.abs(numericBalance).toLocaleString('tr-TR')}
+          {formatTRY(Math.abs(numericBalance))}
         </Text>
       </View>
     );
@@ -537,16 +622,20 @@ export default function Customers() {
     );
   }, [currentData, searchQuery]);
 
+  const visibleMovements = useMemo(() => {
+    if (movementFilter === 'all') {
+      return movements;
+    }
+
+    return movements.filter((movement) => movement.type === movementFilter);
+  }, [movementFilter, movements]);
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <LinearGradient
-        colors={[theme.colors.primaryStrong, theme.colors.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerBrand}>
-          <FirmaLogo size="sm" />
+      <BrandHeroHeader
+        kicker="CARİ YÖNETİMİ"
+        brandSubtitle="Müşteri ve tedarikçileri tek ekrandan yönetin"
+        rightAccessory={
           <TouchableOpacity
             onPress={() => {
               if (!ensureCompany()) {
@@ -554,14 +643,12 @@ export default function Customers() {
               }
               setModalVisible(true);
             }}
-            style={styles.headerAddButton}
+            style={[styles.headerAddButton, { backgroundColor: theme.colors.primary }]}
           >
-            <UserPlus size={18} color="#ffffff" />
-            <Text style={styles.headerAddText}>Yeni Cari</Text>
+            <UserPlus size={24} color="#ffffff" />
           </TouchableOpacity>
-        </View>
-
-        <Text style={styles.title}>Cari Hesaplar</Text>
+        }
+      >
         <TextInput
           style={[
             styles.searchInput,
@@ -572,7 +659,7 @@ export default function Customers() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-      </LinearGradient>
+      </BrandHeroHeader>
 
       <View style={[styles.tabs, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
         <TouchableOpacity
@@ -580,7 +667,7 @@ export default function Customers() {
           onPress={() => setActiveTab('customers')}
         >
           <Text style={[styles.tabText, { color: activeTab === 'customers' ? theme.colors.primary : theme.colors.textMuted }]}>
-            Musteriler ({customers.length})
+            Müşteriler ({customers.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -588,7 +675,7 @@ export default function Customers() {
           onPress={() => setActiveTab('suppliers')}
         >
           <Text style={[styles.tabText, { color: activeTab === 'suppliers' ? theme.colors.primary : theme.colors.textMuted }]}>
-            Tedarikciler ({suppliers.length})
+            Tedarikçiler ({suppliers.length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -606,8 +693,8 @@ export default function Customers() {
             <User size={48} color={theme.colors.textSoft} />
             <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
               {searchQuery
-                ? 'Aramaniza uygun kayit bulunamadi'
-                : `Henuz ${activeTab === 'customers' ? 'musteri' : 'tedarikci'} yok`}
+                ? 'Aramanıza uygun kayıt bulunamadı'
+                : `Henüz ${activeTab === 'customers' ? 'müşteri' : 'tedarikçi'} yok`}
             </Text>
           </View>
         }
@@ -618,14 +705,17 @@ export default function Customers() {
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                Yeni {activeTab === 'customers' ? 'Musteri' : 'Tedarikci'}
+                Yeni {activeTab === 'customers' ? 'Müşteri' : 'Tedarikçi'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.form}>
+            <ScrollView
+              contentContainerStyle={[styles.form, { paddingBottom: modalBottomSpacing }]}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: theme.colors.textMuted }]}>Isim *</Text>
                 <TextInput
@@ -719,7 +809,7 @@ export default function Customers() {
                   {saving ? 'Kaydediliyor...' : 'Kaydet'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -731,7 +821,7 @@ export default function Customers() {
               <View>
                 <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{selectedRecord?.name}</Text>
                 <Text style={[styles.detailBalance, { color: theme.colors.textMuted }]}>
-                  Bakiye: TL {Math.abs(Number(selectedRecord?.balance || 0)).toLocaleString('tr-TR')}
+                  Bakiye: {formatTRY(Math.abs(Number(selectedRecord?.balance || 0)))}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setDetailVisible(false)}>
@@ -740,14 +830,52 @@ export default function Customers() {
             </View>
 
             <ScrollView contentContainerStyle={styles.detailList}>
-              {movements.length === 0 ? (
+              <View style={styles.filterRow}>
+                {[
+                  { key: 'all', label: 'Tümü' },
+                  { key: 'sale', label: 'Satışlar' },
+                  { key: 'payment', label: 'Ödemeler' },
+                ].map((item) => {
+                  const isActive = movementFilter === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={[
+                        styles.filterChip,
+                        {
+                          backgroundColor: isActive
+                            ? theme.colors.primary
+                            : theme.colors.surfaceMuted,
+                          borderColor: isActive
+                            ? theme.colors.primary
+                            : theme.colors.border,
+                        },
+                      ]}
+                      onPress={() =>
+                        setMovementFilter(item.key as 'all' | 'sale' | 'payment')
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          { color: isActive ? '#ffffff' : theme.colors.textMuted },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {visibleMovements.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>
-                    Hesap hareketi bulunmuyor
+                    Bu filtre için hareket bulunmuyor
                   </Text>
                 </View>
               ) : (
-                movements.map((movement) => (
+                visibleMovements.map((movement) => (
                   <View
                     key={movement.id}
                     style={[
@@ -757,16 +885,19 @@ export default function Customers() {
                         borderColor: theme.colors.border,
                       },
                     ]}
-                  >
-                    <View style={styles.movementTextGroup}>
-                      <Text style={[styles.movementTitle, { color: theme.colors.text }]}>
-                        {movement.title}
-                      </Text>
-                      <Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>
-                        {movement.subtitle} ·{' '}
-                        {new Date(movement.date).toLocaleDateString('tr-TR')}
-                      </Text>
-                    </View>
+                    >
+                      <View style={styles.movementTextGroup}>
+                        <Text style={[styles.movementTitle, { color: theme.colors.text }]}>
+                          {movement.title}
+                        </Text>
+                        <Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>
+                          {movement.subtitle} ·{' '}
+                          {new Date(movement.date).toLocaleDateString('tr-TR')}
+                        </Text>
+                        <Text style={[styles.movementBalanceText, { color: theme.colors.textSoft }]}>
+                          İşlem sonrası bakiye: {formatSignedTRY(movement.runningBalance || 0)}
+                        </Text>
+                      </View>
                     <Text
                       style={[
                         styles.movementAmount,
@@ -775,8 +906,7 @@ export default function Customers() {
                           : styles.balanceNegative,
                       ]}
                     >
-                      {movement.amount >= 0 ? '+' : '-'}TL{' '}
-                      {Math.abs(movement.amount).toLocaleString('tr-TR')}
+                      {formatSignedTRY(movement.amount)}
                     </Text>
                   </View>
                 ))
@@ -806,22 +936,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerAddButton: {
-    flexDirection: 'row',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  headerAddText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '700',
+    justifyContent: 'center',
   },
   title: {
+    ...typography.hero,
     fontSize: 28,
-    fontWeight: '800',
     color: '#ffffff',
     marginTop: 16,
     marginBottom: 12,
@@ -846,8 +969,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
   },
   tabText: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
   },
   list: {
     padding: 16,
@@ -877,11 +1000,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 4,
   },
   itemDetail: {
+    ...typography.caption,
     fontSize: 14,
   },
   itemBalance: {
@@ -890,8 +1014,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   balanceText: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '700',
   },
   balancePositive: {
     color: '#22c55e',
@@ -909,8 +1033,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   deleteText: {
+    ...typography.label,
     fontSize: 12,
-    fontWeight: '700',
     color: '#ef4444',
   },
   emptyState: {
@@ -919,6 +1043,7 @@ const styles = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyText: {
+    ...typography.body,
     fontSize: 16,
     color: '#94a3b8',
     marginTop: 16,
@@ -952,10 +1077,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: {
+    ...typography.title,
     fontSize: 20,
-    fontWeight: '700',
   },
   detailBalance: {
+    ...typography.body,
     fontSize: 14,
     marginTop: 4,
   },
@@ -967,8 +1093,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
   },
   input: {
@@ -991,13 +1117,28 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
   },
   detailList: {
     paddingHorizontal: 24,
     paddingBottom: 24,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  filterChipText: {
+    ...typography.label,
+    fontSize: 13,
   },
   movementItem: {
     borderRadius: 12,
@@ -1013,15 +1154,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   movementTitle: {
+    ...typography.heading,
     fontSize: 15,
-    fontWeight: '700',
     marginBottom: 4,
   },
   movementSubtitle: {
+    ...typography.caption,
     fontSize: 13,
   },
+  movementBalanceText: {
+    ...typography.caption,
+    fontSize: 12,
+    marginTop: 6,
+  },
   movementAmount: {
+    ...typography.heading,
     fontSize: 15,
-    fontWeight: '700',
   },
 });

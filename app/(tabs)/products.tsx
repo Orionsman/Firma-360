@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +16,10 @@ import { PackagePlus, X, Package, TriangleAlert as AlertTriangle, Trash2 } from 
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
+import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { formatTRY } from '@/lib/format';
+import { typography } from '@/lib/typography';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Product {
   id: string;
@@ -29,6 +35,9 @@ interface Product {
 export default function Products() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const modalBottomSpacing =
+    Math.max(insets.bottom, Platform.OS === 'android' ? 34 : 20) + 24;
   const [products, setProducts] = useState<Product[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,7 +57,7 @@ export default function Products() {
     if (!company) {
       Alert.alert(
         'Firma gerekli',
-        'Once ana sayfadaki firma kurulum kartindan firmanizi olusturmaniz gerekiyor.'
+        'Önce ana sayfadaki firma kurulum kartından firmanızı oluşturmanız gerekiyor.'
       );
       return false;
     }
@@ -56,7 +65,7 @@ export default function Products() {
     return true;
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     if (!company) {
       setProducts([]);
       return;
@@ -74,11 +83,11 @@ export default function Products() {
     }
 
     setProducts(data ?? []);
-  };
+  }, [company]);
 
   useEffect(() => {
-    fetchProducts();
-  }, [company]);
+    void fetchProducts();
+  }, [fetchProducts]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -88,7 +97,7 @@ export default function Products() {
 
   const handleAdd = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Hata', 'Lutfen urun adi girin.');
+      Alert.alert('Hata', 'Lütfen ürün adı girin.');
       return;
     }
 
@@ -127,7 +136,7 @@ export default function Products() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Urun kaydedilemedi.'
+        error instanceof Error ? error.message : 'Ürün kaydedilemedi.'
       );
     } finally {
       setSaving(false);
@@ -155,7 +164,7 @@ export default function Products() {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Urun silinemedi.'
+        error instanceof Error ? error.message : 'Ürün silinemedi.'
       );
     } finally {
       setDeletingId(null);
@@ -199,7 +208,7 @@ export default function Products() {
         </View>
         <View style={styles.itemPrice}>
           <Text style={[styles.priceText, { color: theme.colors.text }]}>
-            TL {Number(item.sale_price).toLocaleString('tr-TR')}
+            {formatTRY(item.sale_price)}
           </Text>
           <Text style={[styles.unitText, { color: theme.colors.textMuted }]}>/{item.unit}</Text>
         </View>
@@ -218,20 +227,23 @@ export default function Products() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.border }]}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Stok Yonetimi</Text>
-        <TouchableOpacity
-          onPress={() => {
-            if (!ensureCompany()) {
-              return;
-            }
-            setModalVisible(true);
-          }}
-          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-        >
-          <PackagePlus size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </View>
+      <BrandHeroHeader
+        kicker="STOK MERKEZİ"
+        brandSubtitle="Ürün, fiyat ve minimum stok seviyelerini yönetin."
+        rightAccessory={
+          <TouchableOpacity
+            onPress={() => {
+              if (!ensureCompany()) {
+                return;
+              }
+              setModalVisible(true);
+            }}
+            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+          >
+            <PackagePlus size={24} color="#ffffff" />
+          </TouchableOpacity>
+        }
+      />
 
       <FlatList
         data={products}
@@ -244,7 +256,7 @@ export default function Products() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Package size={48} color={theme.colors.textSoft} />
-            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henuz urun yok</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henüz ürün yok</Text>
           </View>
         }
       />
@@ -253,15 +265,18 @@ export default function Products() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Urun</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Ürün</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.form}>
+            <ScrollView
+              contentContainerStyle={[styles.form, { paddingBottom: modalBottomSpacing }]}
+              keyboardShouldPersistTaps="handled"
+            >
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Urun Adi *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ürün Adı *</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -271,7 +286,7 @@ export default function Products() {
                       color: theme.colors.text,
                     },
                   ]}
-                  placeholder="Urun adi"
+                  placeholder="Ürün adı"
                   placeholderTextColor={theme.colors.textSoft}
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
@@ -279,7 +294,7 @@ export default function Products() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Urun Kodu</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ürün Kodu</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -315,7 +330,7 @@ export default function Products() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Stok Miktari</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Stok Miktarı</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -338,7 +353,7 @@ export default function Products() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, styles.halfInputLeft]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Alis Fiyati</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Alış Fiyatı</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -358,7 +373,7 @@ export default function Products() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Satis Fiyati</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Satış Fiyatı</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -413,7 +428,7 @@ export default function Products() {
                   {saving ? 'Kaydediliyor...' : 'Kaydet'}
                 </Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -437,8 +452,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
+    ...typography.title,
     fontSize: 24,
-    fontWeight: '700',
     color: '#0f172a',
   },
   addButton: {
@@ -472,11 +487,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemName: {
+    ...typography.heading,
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 4,
   },
   itemDetail: {
+    ...typography.caption,
     fontSize: 14,
   },
   itemPrice: {
@@ -484,10 +500,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   priceText: {
+    ...typography.heading,
     fontSize: 18,
-    fontWeight: '700',
   },
   unitText: {
+    ...typography.caption,
     fontSize: 12,
   },
   deleteButton: {
@@ -498,8 +515,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   deleteText: {
+    ...typography.label,
     fontSize: 12,
-    fontWeight: '700',
     color: '#ef4444',
   },
   emptyState: {
@@ -508,6 +525,7 @@ const styles = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyText: {
+    ...typography.body,
     fontSize: 16,
     color: '#94a3b8',
     marginTop: 16,
@@ -532,7 +550,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     borderBottomWidth: 1,
   },
-  modalTitle: { fontSize: 20, fontWeight: '700' },
+  modalTitle: { ...typography.title, fontSize: 20 },
   form: {
     paddingHorizontal: 24,
     paddingBottom: 24,
@@ -552,8 +570,8 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   label: {
+    ...typography.label,
     fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
   },
   input: {
@@ -572,8 +590,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   submitButtonText: {
+    ...typography.heading,
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
   },
 });

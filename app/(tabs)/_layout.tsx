@@ -4,12 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard,
   Package,
-  Settings,
   ShoppingCart,
   Users,
   Wallet,
 } from 'lucide-react-native';
 import { useAppTheme } from '@/contexts/ThemeContext';
+import { typography } from '@/lib/typography';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -34,8 +34,8 @@ export default function TabLayout() {
           borderTopRightRadius: 18,
         },
         tabBarLabelStyle: {
+          ...typography.label,
           fontSize: 11,
-          fontWeight: '700',
         },
       }}
     >
@@ -65,7 +65,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="sales"
         options={{
-          title: 'Satislar',
+          title: 'Satışlar',
           tabBarIcon: ({ size, color }) => (
             <ShoppingCart size={size} color={color} />
           ),
@@ -74,15 +74,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Odemeler',
+          title: 'Ödemeler',
           tabBarIcon: ({ size, color }) => <Wallet size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Ayarlar',
-          tabBarIcon: ({ size, color }) => <Settings size={size} color={color} />,
+          href: null,
         }}
       />
     </Tabs>

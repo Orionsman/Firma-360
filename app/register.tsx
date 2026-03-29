@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { FirmaLogo } from '@/components/FirmaLogo';
+import { typography } from '@/lib/typography';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -31,12 +32,12 @@ export default function Register() {
     setSuccessMessage('');
 
     if (!email || !password || !companyName) {
-      setErrorMessage('Lutfen tum alanlari doldurun.');
+      setErrorMessage('Lütfen tüm alanları doldurun.');
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Sifre en az 6 karakter olmalidir.');
+      setErrorMessage('Şifre en az 6 karakter olmalıdır.');
       return;
     }
 
@@ -46,18 +47,18 @@ export default function Register() {
 
       if (result.requiresEmailConfirmation) {
         setSuccessMessage(
-          'Kullanici olusturuldu ancak e-posta dogrulamasi acik. E-postanizi dogrulayin veya Supabase Email dogrulamasini kapatin.'
+          'Kullanıcı oluşturuldu ancak e-posta doğrulaması açık. E-postanızı doğrulayın veya Supabase Email doğrulamasını kapatın.'
         );
         return;
       }
 
-      setSuccessMessage('Hesabiniz olusturuldu. Giris ekranina yonlendiriliyorsunuz.');
+      setSuccessMessage('Hesabınız oluşturuldu. Ana sayfaya yönlendiriliyorsunuz.');
       setTimeout(() => {
-        router.replace('/login');
+        router.replace('/(tabs)');
       }, 1200);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Kayit sirasinda bir hata olustu.'
+        error instanceof Error ? error.message : 'Kayıt sırasında bir hata oluştu.'
       );
     } finally {
       setLoading(false);
@@ -72,18 +73,38 @@ export default function Register() {
       <LinearGradient
         colors={[theme.colors.primaryStrong, theme.colors.primary]}
         style={styles.topGlow}
-      />
+      >
+        <View style={styles.glowOrbPrimary} />
+        <View style={styles.glowOrbSecondary} />
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
-          <FirmaLogo size="sm" />
-          <Text style={[styles.title, { color: theme.colors.text }]}>Yeni hesap olustur</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-            CepteCari ile borc ve alacak takibini kolayca yonetin.
-          </Text>
+        <View
+          style={[
+            styles.heroCard,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              shadowColor: theme.colors.shadow,
+            },
+          ]}
+        >
+          <View style={styles.heroTopRow}>
+            <View style={[styles.heroLogoShell, { backgroundColor: theme.colors.primarySoft }]}>
+              <FirmaLogo size="sm" showWordmark={false} />
+            </View>
+            <View style={styles.heroTextBlock}>
+              <Text style={[styles.title, { color: theme.colors.text }]}>CepteCari</Text>
+              <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+                CepteCari ile borç ve alacak takibini kolayca yönetin.
+              </Text>
+            </View>
+          </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
             <Sparkles size={16} color={theme.colors.accent} />
-            <Text style={[styles.badgeText, { color: theme.colors.text }]}>Hizli kurulum</Text>
+            <Text style={[styles.badgeText, { color: theme.colors.text }]}>
+              Dakikalar içinde başlayın
+            </Text>
           </View>
         </View>
 
@@ -129,7 +150,7 @@ export default function Register() {
             </View>
           ) : null}
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adi</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adı</Text>
           <TextInput
             style={[
               styles.input,
@@ -165,7 +186,7 @@ export default function Register() {
             autoCorrect={false}
           />
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Sifre</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Şifre</Text>
           <TextInput
             style={[
               styles.input,
@@ -192,18 +213,16 @@ export default function Register() {
             onPress={handleRegister}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Kaydediliyor...' : 'Kayit Ol'}
-            </Text>
+            <Text style={styles.buttonText}>{loading ? 'Kaydediliyor...' : 'Kayıt Ol'}</Text>
             {!loading ? <ArrowRight size={18} color="#fff" /> : null}
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.colors.textSoft }]}>
-              Zaten hesabin var mi?{' '}
+              Zaten hesabın var mı?{' '}
             </Text>
             <TouchableOpacity onPress={() => router.back()}>
-              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>Giris Yap</Text>
+              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>Giriş Yap</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -219,43 +238,86 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 280,
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
+    height: 320,
+    borderBottomLeftRadius: 42,
+    borderBottomRightRadius: 42,
+    overflow: 'hidden',
+  },
+  glowOrbPrimary: {
+    position: 'absolute',
+    top: -34,
+    right: -24,
+    width: 176,
+    height: 176,
+    borderRadius: 88,
+    backgroundColor: 'rgba(255,255,255,0.11)',
+  },
+  glowOrbSecondary: {
+    position: 'absolute',
+    bottom: -48,
+    left: -30,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(34,228,214,0.12)',
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
   },
-  hero: {
+  heroCard: {
+    marginTop: 28,
+    marginBottom: 24,
+    borderRadius: 30,
+    borderWidth: 1,
+    padding: 20,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 7,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 26,
-    marginTop: 24,
+    gap: 16,
+  },
+  heroLogoShell: {
+    width: 86,
+    height: 86,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroTextBlock: {
+    flex: 1,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 30,
-    fontWeight: '800',
-    marginTop: 16,
+    ...typography.hero,
+    fontSize: 34,
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   subtitle: {
+    ...typography.body,
     fontSize: 15,
-    textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
     lineHeight: 22,
   },
   badge: {
-    marginTop: 16,
+    alignSelf: 'flex-start',
+    marginTop: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 999,
   },
   badgeText: {
+    ...typography.label,
     fontSize: 13,
-    fontWeight: '700',
   },
   formCard: {
     borderWidth: 1,
@@ -273,12 +335,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   messageText: {
+    ...typography.bodyStrong,
     fontSize: 14,
-    fontWeight: '600',
   },
   label: {
+    ...typography.label,
     fontSize: 13,
-    fontWeight: '700',
     marginBottom: 8,
     marginTop: 10,
   },
@@ -302,9 +364,9 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
+    ...typography.heading,
     color: '#fff',
     fontSize: 16,
-    fontWeight: '800',
   },
   footer: {
     marginTop: 22,
@@ -312,10 +374,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerText: {
+    ...typography.body,
     fontSize: 14,
   },
   link: {
+    ...typography.heading,
     fontSize: 14,
-    fontWeight: '800',
   },
 });
