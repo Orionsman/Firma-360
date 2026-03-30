@@ -3,13 +3,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider, useAppTheme } from '@/contexts/ThemeContext';
+import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 
 function AppNavigator() {
   const { mode } = useAppTheme();
+  const { locale } = useLocale();
 
   return (
     <>
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack key={locale} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
@@ -29,9 +31,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppNavigator />
-      </AuthProvider>
+      <LocaleProvider>
+        <AuthProvider>
+          <AppNavigator />
+        </AuthProvider>
+      </LocaleProvider>
     </ThemeProvider>
   );
 }

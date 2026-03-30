@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { FirmaLogo } from '@/components/FirmaLogo';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 export default function Register() {
@@ -32,12 +33,12 @@ export default function Register() {
     setSuccessMessage('');
 
     if (!email || !password || !companyName) {
-      setErrorMessage('Lütfen tüm alanları doldurun.');
+      setErrorMessage(t.auth.register.emailRequired);
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Şifre en az 6 karakter olmalıdır.');
+      setErrorMessage(t.auth.register.passwordTooShort);
       return;
     }
 
@@ -46,19 +47,17 @@ export default function Register() {
       const result = await signUp(email, password, companyName);
 
       if (result.requiresEmailConfirmation) {
-        setSuccessMessage(
-          'Kullanıcı oluşturuldu ancak e-posta doğrulaması açık. E-postanızı doğrulayın veya Supabase Email doğrulamasını kapatın.'
-        );
+        setSuccessMessage(t.auth.register.emailConfirm);
         return;
       }
 
-      setSuccessMessage('Hesabınız oluşturuldu. Ana sayfaya yönlendiriliyorsunuz.');
+      setSuccessMessage(t.auth.register.success);
       setTimeout(() => {
         router.replace('/(tabs)');
       }, 1200);
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Kayıt sırasında bir hata oluştu.'
+        error instanceof Error ? error.message : t.auth.register.failed
       );
     } finally {
       setLoading(false);
@@ -94,16 +93,16 @@ export default function Register() {
               <FirmaLogo size="sm" showWordmark={false} />
             </View>
             <View style={styles.heroTextBlock}>
-              <Text style={[styles.title, { color: theme.colors.text }]}>CepteCari</Text>
+              <Text style={[styles.title, { color: theme.colors.text }]}>{t.auth.appName}</Text>
               <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-                CepteCari ile borç ve alacak takibini kolayca yönetin.
+                {t.auth.register.heroSubtitle}
               </Text>
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
             <Sparkles size={16} color={theme.colors.accent} />
             <Text style={[styles.badgeText, { color: theme.colors.text }]}>
-              Dakikalar içinde başlayın
+              {t.auth.register.badge}
             </Text>
           </View>
         </View>
@@ -150,7 +149,9 @@ export default function Register() {
             </View>
           ) : null}
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adı</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+            {t.common.fields.companyName}
+          </Text>
           <TextInput
             style={[
               styles.input,
@@ -167,7 +168,7 @@ export default function Register() {
             autoCapitalize="words"
           />
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>E-posta</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.email}</Text>
           <TextInput
             style={[
               styles.input,
@@ -186,7 +187,7 @@ export default function Register() {
             autoCorrect={false}
           />
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Şifre</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.password}</Text>
           <TextInput
             style={[
               styles.input,
@@ -196,7 +197,7 @@ export default function Register() {
                 color: theme.colors.text,
               },
             ]}
-            placeholder="En az 6 karakter"
+            placeholder={t.settings.password.placeholder}
             placeholderTextColor={theme.colors.textSoft}
             value={password}
             onChangeText={setPassword}
@@ -213,16 +214,20 @@ export default function Register() {
             onPress={handleRegister}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? 'Kaydediliyor...' : 'Kayıt Ol'}</Text>
+            <Text style={styles.buttonText}>
+              {loading ? t.auth.register.signingUp : t.auth.register.signUp}
+            </Text>
             {!loading ? <ArrowRight size={18} color="#fff" /> : null}
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.colors.textSoft }]}>
-              Zaten hesabın var mı?{' '}
+              {t.auth.register.hasAccount}{' '}
             </Text>
             <TouchableOpacity onPress={() => router.back()}>
-              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>Giriş Yap</Text>
+              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>
+                {t.auth.register.signIn}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

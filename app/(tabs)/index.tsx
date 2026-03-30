@@ -1,28 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  TouchableOpacity,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  Layers3,
-  Package,
-  Plus,
-  Users,
-} from 'lucide-react-native';
+import { Layers3, Package, Plus, Users } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { FirmaLogo } from '@/components/FirmaLogo';
 import { UserPanelModal } from '@/components/UserPanelModal';
 import { formatSignedTRY, formatTRY } from '@/lib/format';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 interface DashboardStats {
@@ -39,7 +35,8 @@ interface ActivityItem {
   title: string;
   subtitle: string;
   amount: number;
-  tone: 'positive' | 'negative';
+  tone: 'income' | 'expense';
+  kind: 'sale' | 'income' | 'expense';
   timestamp: number;
 }
 
@@ -57,7 +54,9 @@ export default function Dashboard() {
     totalSales: 0,
   });
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
   const [companyName, setCompanyName] = useState('');
   const [creatingCompany, setCreatingCompany] = useState(false);
   const [userPanelVisible, setUserPanelVisible] = useState(false);
@@ -73,53 +72,11 @@ export default function Dashboard() {
         totalSales: 0,
       });
       setRecentActivity([]);
+      setLoadingDashboard(false);
       return;
     }
 
-    const [salesResult, paymentsResult, customersResult, productsResult] =
-      await Promise.all([
-        supabase
-          .from('sales')
-          .select('id, total_amount, sale_date, created_at, customers(name)')
-          .eq('company_id', company.id)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase
-          .from('payments')
-          .select(
-            'id, amount, payment_date, payment_type, description, created_at, customers(name), suppliers(name)'
-          )
-          .eq('company_id', company.id)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase.from('customers').select('id').eq('company_id', company.id),
-        supabase.from('products').select('id').eq('company_id', company.id),
-      ]);
-
-    if (salesResult.error || paymentsResult.error || customersResult.error || productsResult.error) {
-      Alert.alert(
-        'Hata',
-        salesResult.error?.message ||
-          paymentsResult.error?.message ||
-          customersResult.error?.message ||
-          productsResult.error?.message ||
-          'Veriler yüklenemedi.'
-      );
-      return;
-    }
-
-    const sales = salesResult.data ?? [];
-    const payments = paymentsResult.data ?? [];
-    const totalSales = sales.reduce(
-      (sum, sale) => sum + Number(sale.total_amount || 0),
-      0
-    );
-    const totalIncome = payments
-      .filter((payment) => payment.payment_type === 'income')
-      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-    const totalExpense = payments
-      .filter((payment) => payment.payment_type === 'expense')
-      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    setLoadingDashboard(true);
 
     const getRelationName = (value: RelationRecord) => {
       if (!value) {
@@ -129,41 +86,121 @@ export default function Dashboard() {
       return Array.isArray(value) ? value[0]?.name : value.name;
     };
 
-    const activities: ActivityItem[] = [
-      ...sales.map((sale) => ({
-        id: `sale-${sale.id}`,
-        title: getRelationName(sale.customers as RelationRecord) || 'Müşteri satışı',
-        subtitle: new Date(sale.sale_date).toLocaleDateString('tr-TR'),
-        amount: Number(sale.total_amount || 0),
-        tone: 'positive' as const,
-        timestamp: new Date(sale.created_at || sale.sale_date).getTime(),
-      })),
-      ...payments.map((payment) => ({
-        id: `payment-${payment.id}`,
-        title:
-          payment.payment_type === 'income'
-            ? getRelationName(payment.customers as RelationRecord) || 'Tahsilat'
-            : getRelationName(payment.suppliers as RelationRecord) || 'Ödeme',
-        subtitle:
-          payment.description ||
-          new Date(payment.payment_date).toLocaleDateString('tr-TR'),
-        amount: Number(payment.amount || 0),
-        tone: payment.payment_type === 'income' ? ('positive' as const) : ('negative' as const),
-        timestamp: new Date(payment.created_at || payment.payment_date).getTime(),
-      })),
-    ]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 5);
+    try {
+      const [
+        salesTotalsResult,
+        paymentsTotalsResult,
+        salesActivityResult,
+        paymentsActivityResult,
+        customersResult,
+        productsResult,
+      ] = await Promise.all([
+        supabase.from('sales').select('total_amount').eq('company_id', company.id),
+        supabase
+          .from('payments')
+          .select('amount, payment_type')
+          .eq('company_id', company.id),
+        supabase
+          .from('sales')
+          .select('id, total_amount, sale_date, created_at, customers(name)')
+          .eq('company_id', company.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('payments')
+          .select(
+            'id, amount, payment_date, payment_type, description, created_at, customers(name), suppliers(name)'
+          )
+          .eq('company_id', company.id)
+          .order('created_at', { ascending: false }),
+        supabase.from('customers').select('id').eq('company_id', company.id),
+        supabase.from('products').select('id').eq('company_id', company.id),
+      ]);
 
-    setStats({
-      totalReceivables: Math.max(totalSales - totalIncome, 0),
-      totalPayables: totalExpense,
-      cashBalance: totalIncome - totalExpense,
-      totalCustomers: customersResult.data?.length || 0,
-      totalProducts: productsResult.data?.length || 0,
-      totalSales,
-    });
-    setRecentActivity(activities);
+      if (
+        salesTotalsResult.error ||
+        paymentsTotalsResult.error ||
+        salesActivityResult.error ||
+        paymentsActivityResult.error ||
+        customersResult.error ||
+        productsResult.error
+      ) {
+        Alert.alert(
+          t.common.error,
+          salesTotalsResult.error?.message ||
+            paymentsTotalsResult.error?.message ||
+            salesActivityResult.error?.message ||
+            paymentsActivityResult.error?.message ||
+            customersResult.error?.message ||
+            productsResult.error?.message ||
+            t.dashboard.errors.loadFailed
+        );
+        return;
+      }
+
+      const salesTotals = salesTotalsResult.data ?? [];
+      const paymentTotals = paymentsTotalsResult.data ?? [];
+      const salesActivity = salesActivityResult.data ?? [];
+      const paymentsActivity = paymentsActivityResult.data ?? [];
+
+      const totalSales = salesTotals.reduce(
+        (sum, sale) => sum + Number(sale.total_amount || 0),
+        0
+      );
+      const totalIncome = paymentTotals
+        .filter((payment) => payment.payment_type === 'income')
+        .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+      const totalExpense = paymentTotals
+        .filter((payment) => payment.payment_type === 'expense')
+        .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+
+      const activities: ActivityItem[] = [
+        ...salesActivity.map((sale) => ({
+          id: `sale-${sale.id}`,
+          title:
+            getRelationName(sale.customers as RelationRecord) ||
+            t.dashboard.activity.customerSale,
+          subtitle: new Date(sale.sale_date).toLocaleDateString('tr-TR'),
+          amount: Number(sale.total_amount || 0),
+          tone: 'income' as const,
+          kind: 'sale' as const,
+          timestamp: new Date(sale.created_at || sale.sale_date).getTime(),
+        })),
+        ...paymentsActivity.map((payment) => ({
+          id: `payment-${payment.id}`,
+          title:
+            payment.payment_type === 'income'
+              ? getRelationName(payment.customers as RelationRecord) ||
+                t.dashboard.activity.collection
+              : getRelationName(payment.suppliers as RelationRecord) ||
+                t.dashboard.activity.payment,
+          subtitle:
+            payment.description ||
+            new Date(payment.payment_date).toLocaleDateString('tr-TR'),
+          amount: Number(payment.amount || 0),
+          tone:
+            payment.payment_type === 'income'
+              ? ('income' as const)
+              : ('expense' as const),
+          kind:
+            payment.payment_type === 'income'
+              ? ('income' as const)
+              : ('expense' as const),
+          timestamp: new Date(payment.created_at || payment.payment_date).getTime(),
+        })),
+      ].sort((a, b) => b.timestamp - a.timestamp);
+
+      setStats({
+        totalReceivables: Math.max(totalSales - totalIncome, 0),
+        totalPayables: totalExpense,
+        cashBalance: totalIncome - totalExpense,
+        totalCustomers: customersResult.data?.length || 0,
+        totalProducts: productsResult.data?.length || 0,
+        totalSales,
+      });
+      setRecentActivity(activities);
+    } finally {
+      setLoadingDashboard(false);
+    }
   }, [company]);
 
   useEffect(() => {
@@ -186,30 +223,40 @@ export default function Dashboard() {
     () => [
       {
         key: 'customers',
-        label: 'Cari Hesaplar',
+        label: t.dashboard.quickActions.customers,
         icon: Users,
         onPress: () => router.push('/(tabs)/customers'),
       },
       {
         key: 'new-action',
-        label: 'Yeni İşlem',
+        label: t.dashboard.quickActions.newAction,
         icon: Plus,
         onPress: () =>
-          Alert.alert('Yeni İşlem', 'Eklemek istediğiniz işlem türünü seçin.', [
-            { text: 'İptal', style: 'cancel' },
-            { text: 'Satış', onPress: () => router.push('/(tabs)/sales') },
-            { text: 'Ödeme', onPress: () => router.push('/(tabs)/payments') },
-          ]),
+          Alert.alert(
+            t.dashboard.quickActions.newAction,
+            t.dashboard.quickActions.prompt,
+            [
+              { text: t.common.cancel, style: 'cancel' },
+              {
+                text: t.dashboard.quickActions.sales,
+                onPress: () => router.push('/(tabs)/sales'),
+              },
+              {
+                text: t.dashboard.quickActions.payments,
+                onPress: () => router.push('/(tabs)/payments'),
+              },
+            ]
+          ),
       },
       {
         key: 'products',
-        label: 'Stoklar',
+        label: t.dashboard.quickActions.products,
         icon: Package,
         onPress: () => router.push('/(tabs)/products'),
       },
       {
         key: 'reports',
-        label: 'Raporlar',
+        label: t.dashboard.quickActions.reports,
         icon: Layers3,
         onPress: () => router.push('/reports'),
       },
@@ -221,6 +268,66 @@ export default function Dashboard() {
     const source = company?.name || user?.email || 'CepteCari';
     return source.trim().charAt(0).toUpperCase();
   }, [company?.name, user?.email]);
+
+  const visibleRecentActivity = useMemo(
+    () => (showAllRecentActivity ? recentActivity : recentActivity.slice(0, 5)),
+    [recentActivity, showAllRecentActivity]
+  );
+
+  const summaryCards = useMemo(
+    () => [
+      {
+        key: 'receivables',
+        label: t.dashboard.summary.receivables,
+        value: formatTRY(stats.totalReceivables),
+        backgroundColor: mode === 'dark' ? '#3B2630' : '#FFF0F1',
+        borderColor: mode === 'dark' ? '#5E3643' : '#FFD6DA',
+        valueColor: mode === 'dark' ? '#FFD5DA' : '#B64051',
+      },
+      {
+        key: 'payables',
+        label: t.dashboard.summary.payables,
+        value: formatTRY(stats.totalPayables),
+        backgroundColor: mode === 'dark' ? '#1F334D' : '#EEF5FF',
+        borderColor: mode === 'dark' ? '#30537F' : '#D4E5FF',
+        valueColor: mode === 'dark' ? '#D8E8FF' : '#2356A8',
+      },
+      {
+        key: 'cash-balance',
+        label: t.dashboard.summary.cashBalance,
+        value: formatTRY(stats.cashBalance),
+        backgroundColor: mode === 'dark' ? '#1E3A33' : '#EEF9F2',
+        borderColor: mode === 'dark' ? '#2D6155' : '#D2EFDD',
+        valueColor: mode === 'dark' ? '#D7F7E2' : '#1E7A52',
+        wide: true,
+      },
+    ],
+    [mode, stats.cashBalance, stats.totalPayables, stats.totalReceivables]
+  );
+
+  const getActivityBadge = (kind: ActivityItem['kind']) => {
+    if (kind === 'sale') {
+      return {
+        label: t.dashboard.activity.saleBadge,
+        backgroundColor: '#DBEAFE',
+        color: '#1D4ED8',
+      };
+    }
+
+    if (kind === 'income') {
+      return {
+        label: t.dashboard.activity.collectionBadge,
+        backgroundColor: '#DCFCE7',
+        color: '#166534',
+      };
+    }
+
+    return {
+      label: t.dashboard.activity.paymentBadge,
+      backgroundColor: '#FEE2E2',
+      color: '#B91C1C',
+    };
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -235,7 +342,6 @@ export default function Dashboard() {
           end={{ x: 1, y: 1 }}
           style={styles.hero}
         >
-          <View style={styles.heroGrid} />
           <View style={styles.heroOrbOne} />
           <View style={styles.heroOrbTwo} />
           <View style={styles.heroOrbThree} />
@@ -252,8 +358,8 @@ export default function Dashboard() {
                 </View>
                 <View style={styles.brandText}>
                   <Text style={styles.brandTitle}>CepteCari</Text>
-                  <Text style={styles.brandKicker}>AKILLI CARİ YÖNETİMİ</Text>
-                  <Text style={styles.brandSubtitle}>Cari takibin cebinde</Text>
+                  <Text style={styles.brandKicker}>{t.dashboard.hero.kicker}</Text>
+                  <Text style={styles.brandSubtitle}>{t.dashboard.hero.subtitle}</Text>
                 </View>
               </View>
             </View>
@@ -268,30 +374,29 @@ export default function Dashboard() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.heroGreeting}>Merhaba, {company?.name || 'CepteCari'}!</Text>
-          <Text style={styles.heroSubtitle}>
-            Tahsilat, satış ve bakiye hareketlerini aynı yerde net bir görünümle izleyin.
+          <Text style={styles.heroGreeting}>
+            {t.dashboard.hero.greetingPrefix} {company?.name || 'CepteCari'}!
           </Text>
+          <Text style={styles.heroSubtitle}>{t.dashboard.hero.summary}</Text>
 
           <View style={styles.summaryStack}>
-            <View style={[styles.summaryCard, styles.summaryRed]}>
-              <Text style={styles.summaryLabel}>Alacaklar</Text>
-              <Text style={styles.summaryValue}>
-                {formatTRY(stats.totalReceivables)}
-              </Text>
-            </View>
-            <View style={[styles.summaryCard, styles.summaryBlue]}>
-              <Text style={styles.summaryLabel}>Borçlar</Text>
-              <Text style={styles.summaryValue}>
-                {formatTRY(stats.totalPayables)}
-              </Text>
-            </View>
-            <View style={[styles.summaryCardWide, styles.summaryGreen]}>
-              <Text style={styles.summaryLabel}>Kasa Bakiyesi</Text>
-              <Text style={styles.summaryValue}>
-                {formatTRY(stats.cashBalance)}
-              </Text>
-            </View>
+            {summaryCards.map((card) => (
+              <View
+                key={card.key}
+                style={[
+                  card.wide ? styles.summaryCardWide : styles.summaryCard,
+                  {
+                    backgroundColor: card.backgroundColor,
+                    borderColor: card.borderColor,
+                  },
+                ]}
+              >
+                <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>
+                  {card.label}
+                </Text>
+                <Text style={[styles.summaryValue, { color: card.valueColor }]}>{card.value}</Text>
+              </View>
+            ))}
           </View>
         </LinearGradient>
 
@@ -303,10 +408,10 @@ export default function Dashboard() {
             ]}
           >
             <Text style={[styles.setupTitle, { color: theme.colors.text }]}>
-              İlk firma kaydını oluşturun
+              {t.dashboard.setup.title}
             </Text>
             <Text style={[styles.setupText, { color: theme.colors.textMuted }]}>
-              Cari, borç ve alacak takibini başlatmak için firma adınızı girin.
+              {t.dashboard.setup.text}
             </Text>
 
             <TextInput
@@ -318,7 +423,7 @@ export default function Dashboard() {
                   color: theme.colors.text,
                 },
               ]}
-              placeholder="Firma adı"
+              placeholder={t.dashboard.setup.placeholder}
               placeholderTextColor={theme.colors.textSoft}
               value={companyName}
               onChangeText={setCompanyName}
@@ -333,7 +438,7 @@ export default function Dashboard() {
               disabled={creatingCompany}
               onPress={async () => {
                 if (!companyName.trim()) {
-                  Alert.alert('Hata', 'Lütfen firma adı girin.');
+                  Alert.alert(t.common.error, t.dashboard.errors.companyNameRequired);
                   return;
                 }
 
@@ -341,11 +446,13 @@ export default function Dashboard() {
                 try {
                   await createCompanyProfile(companyName);
                   setCompanyName('');
-                  Alert.alert('Başarılı', 'Firma oluşturuldu.');
+                  Alert.alert(t.common.success, t.dashboard.setup.created);
                 } catch (error: unknown) {
                   Alert.alert(
-                    'Hata',
-                    error instanceof Error ? error.message : 'Firma oluşturulamadı.'
+                    t.common.error,
+                    error instanceof Error
+                      ? error.message
+                      : t.dashboard.errors.companyCreateFailed
                   );
                 } finally {
                   setCreatingCompany(false);
@@ -353,7 +460,7 @@ export default function Dashboard() {
               }}
             >
               <Text style={styles.setupButtonText}>
-                {creatingCompany ? 'Oluşturuluyor...' : 'Firma Oluştur'}
+                {creatingCompany ? t.dashboard.setup.creating : t.dashboard.setup.button}
               </Text>
             </TouchableOpacity>
           </View>
@@ -361,7 +468,9 @@ export default function Dashboard() {
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Hızlı İşlemler</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              {t.dashboard.quickActions.title}
+            </Text>
           </View>
           <View style={styles.quickGrid}>
             {quickActions.map((action) => {
@@ -392,48 +501,99 @@ export default function Dashboard() {
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Son Hareketler</Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/payments')}>
-              <Text style={[styles.seeAll, { color: theme.colors.primary }]}>Tümünü Gör</Text>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              {t.dashboard.activity.title}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowAllRecentActivity((current) => !current)}
+              disabled={recentActivity.length <= 5}
+            >
+              <Text
+                style={[
+                  styles.seeAll,
+                  {
+                    color:
+                      recentActivity.length <= 5
+                        ? theme.colors.textSoft
+                        : theme.colors.primary,
+                  },
+                ]}
+              >
+                {recentActivity.length <= 5
+                  ? t.dashboard.activity.allListed
+                  : showAllRecentActivity
+                    ? t.dashboard.activity.showLess
+                    : t.dashboard.activity.showAll}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {recentActivity.length === 0 ? (
+          {loadingDashboard ? (
             <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
-              Henüz hareket bulunmuyor.
+              {t.dashboard.activity.loading}
+            </Text>
+          ) : recentActivity.length === 0 ? (
+            <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
+              {t.dashboard.activity.empty}
             </Text>
           ) : (
-            recentActivity.map((item) => (
-              <View
-                key={item.id}
-                style={[styles.activityRow, { borderBottomColor: theme.colors.border }]}
-              >
-                <View style={styles.activityAvatar}>
-                  <Text style={styles.activityAvatarText}>
-                    {item.title.slice(0, 1).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.activityText}>
-                  <Text style={[styles.activityTitle, { color: theme.colors.text }]}>
-                    {item.title}
-                  </Text>
-                  <Text style={[styles.activitySubtitle, { color: theme.colors.textMuted }]}>
-                    {item.subtitle}
-                  </Text>
-                </View>
-                <Text
-                  style={[
-                    styles.activityAmount,
-                    {
-                      color:
-                        item.tone === 'positive' ? theme.colors.success : theme.colors.danger,
-                    },
-                  ]}
+            visibleRecentActivity.map((item) => {
+              const badge = getActivityBadge(item.kind);
+
+              return (
+                <View
+                  key={item.id}
+                  style={[styles.activityRow, { borderBottomColor: theme.colors.border }]}
                 >
-                  {formatSignedTRY(item.tone === 'positive' ? item.amount : -item.amount)}
-                </Text>
-              </View>
-            ))
+                  <View
+                    style={[
+                      styles.activityAvatar,
+                      { backgroundColor: mode === 'dark' ? theme.colors.primarySoft : '#EAF1FF' },
+                    ]}
+                  >
+                    <Text style={[styles.activityAvatarText, { color: theme.colors.primary }]}>
+                      {item.title.slice(0, 1).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.activityText}>
+                    <View style={styles.activityTitleRow}>
+                      <Text style={[styles.activityTitle, { color: theme.colors.text }]}>
+                        {item.title}
+                      </Text>
+                      <View
+                        style={[
+                          styles.activityBadge,
+                          { backgroundColor: badge.backgroundColor },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.activityBadgeText,
+                            { color: badge.color },
+                          ]}
+                        >
+                          {badge.label}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.activitySubtitle, { color: theme.colors.textMuted }]}>
+                      {item.subtitle}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[
+                      styles.activityAmount,
+                      {
+                        color:
+                          item.tone === 'income' ? theme.colors.success : theme.colors.danger,
+                      },
+                    ]}
+                  >
+                    {formatSignedTRY(item.tone === 'income' ? item.amount : -item.amount)}
+                  </Text>
+                </View>
+              );
+            })
           )}
         </View>
 
@@ -454,7 +614,7 @@ export default function Dashboard() {
               {stats.totalCustomers}
             </Text>
             <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>
-              Cari Hesap
+              {t.dashboard.meta.customerAccounts}
             </Text>
           </View>
           <View
@@ -472,7 +632,9 @@ export default function Dashboard() {
             <Text style={[styles.metaValue, { color: theme.colors.text }]}>
               {stats.totalProducts}
             </Text>
-            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>Stok Kalemi</Text>
+            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>
+              {t.dashboard.meta.stockItems}
+            </Text>
           </View>
           <View
             style={[
@@ -489,7 +651,9 @@ export default function Dashboard() {
             <Text style={[styles.metaValue, { color: theme.colors.text }]}>
               {formatTRY(stats.totalSales)}
             </Text>
-            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>Toplam Satış</Text>
+            <Text style={[styles.metaLabel, { color: theme.colors.textMuted }]}>
+              {t.dashboard.meta.totalSales}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -508,49 +672,37 @@ const styles = StyleSheet.create({
   hero: {
     paddingTop: 46,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 22,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     overflow: 'hidden',
   },
-  heroGrid: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0.12,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    transform: [{ scale: 1.18 }, { rotate: '-9deg' }],
-  },
   heroOrbOne: {
     position: 'absolute',
-    top: -40,
-    right: -18,
-    width: 158,
-    height: 158,
-    borderRadius: 79,
-    backgroundColor: 'rgba(255,255,255,0.11)',
+    top: -34,
+    right: -26,
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   heroOrbTwo: {
     position: 'absolute',
-    top: 102,
-    left: -28,
-    width: 114,
-    height: 114,
-    borderRadius: 57,
-    backgroundColor: 'rgba(34,228,214,0.12)',
+    top: 124,
+    left: -22,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(25,184,166,0.12)',
   },
   heroOrbThree: {
     position: 'absolute',
-    bottom: -62,
-    right: '26%',
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    backgroundColor: 'rgba(17, 12, 56, 0.16)',
+    bottom: -54,
+    right: '24%',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(12, 23, 60, 0.16)',
   },
   heroTop: {
     flexDirection: 'row',
@@ -562,16 +714,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     flex: 1,
     maxWidth: '84%',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.18)',
     shadowColor: '#100828',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.16,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
   },
   brandHalo: {
     position: 'absolute',
@@ -584,7 +736,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 12,
   },
   brandLogoShell: {
@@ -613,16 +765,15 @@ const styles = StyleSheet.create({
   brandText: {
     flex: 1,
     minHeight: 58,
-    justifyContent: 'flex-end',
-    paddingBottom: 2,
+    justifyContent: 'center',
   },
   brandKicker: {
     ...typography.label,
     color: 'rgba(255,255,255,0.72)',
-    fontSize: 9,
-    letterSpacing: 1.2,
+    fontSize: 11,
+    letterSpacing: 1,
     textTransform: 'uppercase',
-    marginTop: 3,
+    marginTop: 4,
   },
   brandTitle: {
     ...typography.hero,
@@ -633,8 +784,9 @@ const styles = StyleSheet.create({
   brandSubtitle: {
     ...typography.body,
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 10,
-    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
   },
   profileDot: {
     width: 58,
@@ -663,52 +815,48 @@ const styles = StyleSheet.create({
   heroGreeting: {
     ...typography.hero,
     color: '#FFFFFF',
-    fontSize: 26,
-    marginTop: 2,
-    lineHeight: 31,
-    maxWidth: '92%',
+    fontSize: 28,
+    marginTop: 8,
+    lineHeight: 33,
+    maxWidth: '88%',
   },
   heroSubtitle: {
     ...typography.body,
     color: 'rgba(255,255,255,0.8)',
-    fontSize: 13,
+    fontSize: 14,
     marginTop: 8,
-    lineHeight: 18,
-    maxWidth: '90%',
+    lineHeight: 20,
+    maxWidth: '82%',
   },
   summaryStack: {
-    marginTop: 16,
+    marginTop: 18,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   summaryCard: {
     flex: 1,
     minWidth: 140,
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
   },
   summaryCardWide: {
     width: '100%',
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
   },
-  summaryRed: { backgroundColor: '#FF626B' },
-  summaryBlue: { backgroundColor: '#2F80ED' },
-  summaryGreen: { backgroundColor: '#38C977' },
   summaryLabel: {
     ...typography.label,
-    color: '#FFFFFF',
-    fontSize: 10,
-    opacity: 0.92,
+    fontSize: 11,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   summaryValue: {
     ...typography.hero,
-    color: '#FFFFFF',
-    fontSize: 20,
-    marginTop: 4,
+    fontSize: 21,
+    marginTop: 6,
   },
   setupCard: {
     marginHorizontal: 16,
@@ -752,6 +900,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 18,
     padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -775,10 +925,12 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     width: '48%',
-    borderRadius: 16,
+    borderRadius: 18,
     paddingVertical: 16,
     paddingHorizontal: 12,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   quickIconWrap: {
     width: 38,
@@ -808,22 +960,35 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E8ECFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   activityAvatarText: {
     ...typography.heading,
-    color: '#3156F5',
     fontSize: 15,
   },
   activityText: {
     flex: 1,
   },
+  activityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   activityTitle: {
     ...typography.heading,
     fontSize: 15,
+  },
+  activityBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  activityBadgeText: {
+    ...typography.label,
+    fontSize: 10,
   },
   activitySubtitle: {
     ...typography.caption,

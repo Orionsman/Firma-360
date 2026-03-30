@@ -7,7 +7,7 @@
     "scheme": "ceptecari",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "icon": "./assets/icon.png",
+    "icon": "./assets/cepte-cari-icon-square.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ceptecari.mobile",
@@ -20,7 +20,7 @@
       "package": "com.ceptecari.mobile",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/cepte-cari-adaptive-square.png",
         "backgroundColor": "#1A0D45"
       },
       "edgeToEdgeEnabled": true
@@ -28,24 +28,27 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/cepte-cari-logo-tight.png"
     },
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/cepte-cari-logo-tight.png",
       "resizeMode": "contain",
       "backgroundColor": "#1A0D45"
-PS C:\Users\Win10\Desktop\Firma 360\Firma-360> git config --global user.name "Enes ÖZÇELİK"
-git : The term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the
- spelling of the name, or if a path was included, verify that the path is correct and try again.
-At line:1 char:1
-+ git config --global user.name "Enes ÖZÇELİK"
-+ ~~~
-    + CategoryInfo          : ObjectNotFound: (git:String) [], CommandNotFoundException
-    + FullyQualifiedErrorId : CommandNotFoundException
-     },
-    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f120cc92-a388-4872-bd32-95fc790982cd"
+      }
+    },
+    "owner": "enes94"
   }
 }

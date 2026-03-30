@@ -1,0 +1,30 @@
+export const enAuth = {
+  appName: 'CepteCari',
+  appSubtitle: 'Business finance in your pocket',
+  login: {
+    secureEntry: 'Secure sign-in',
+    title: 'Sign in',
+    subtitle: 'Simple account tracking for small businesses and individuals.',
+    emailRequired: 'Please fill in all fields.',
+    failed: 'Could not sign you in.',
+    password: 'Password',
+    signIn: 'Sign In',
+    signingIn: 'Signing in...',
+    noAccount: "Don't have an account?",
+    register: 'Register',
+  },
+  register: {
+    heroSubtitle: 'Start managing receivables and payables in minutes.',
+    badge: 'Start in minutes',
+    emailRequired: 'Please fill in all fields.',
+    passwordTooShort: 'Password must be at least 6 characters.',
+    emailConfirm:
+      'Your account was created, but email verification is enabled. Verify your email or turn off Supabase email confirmation.',
+    success: 'Your account has been created. Redirecting you now.',
+    failed: 'Could not create your account.',
+    signUp: 'Register',
+    signingUp: 'Saving...',
+    hasAccount: 'Already have an account?',
+    signIn: 'Sign In',
+  },
+} as const;

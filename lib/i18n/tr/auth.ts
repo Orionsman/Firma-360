@@ -1,0 +1,30 @@
+export const trAuth = {
+  appName: 'CepteCari',
+  appSubtitle: 'İş takibin cebinde',
+  login: {
+    secureEntry: 'Güvenli erişim',
+    title: 'Giriş yap',
+    subtitle: 'Esnaflar ve bireysel kullanıcılar için sade cari takibi.',
+    emailRequired: 'Lütfen tüm alanları doldurun.',
+    failed: 'Giriş yapılırken bir sorun oluştu.',
+    password: 'Şifre',
+    signIn: 'Giriş Yap',
+    signingIn: 'Giriş yapılıyor...',
+    noAccount: 'Hesabın yok mu?',
+    register: 'Kayıt Ol',
+  },
+  register: {
+    heroSubtitle: 'Borç ve alacak takibini dakikalar içinde başlatın.',
+    badge: 'Dakikalar içinde başlayın',
+    emailRequired: 'Lütfen tüm alanları doldurun.',
+    passwordTooShort: 'Şifre en az 6 karakter olmalıdır.',
+    emailConfirm:
+      'Kullanıcı oluşturuldu ancak e-posta doğrulaması açık. E-postanızı doğrulayın veya Supabase Email doğrulamasını kapatın.',
+    success: 'Hesabınız oluşturuldu. Ana sayfaya yönlendiriliyorsunuz.',
+    failed: 'Kayıt sırasında bir sorun oluştu.',
+    signUp: 'Kayıt Ol',
+    signingUp: 'Kaydediliyor...',
+    hasAccount: 'Zaten hesabın var mı?',
+    signIn: 'Giriş Yap',
+  },
+} as const;

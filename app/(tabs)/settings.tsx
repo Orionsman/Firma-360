@@ -14,6 +14,7 @@ import {
   FileLock2,
   Info,
   KeyRound,
+  Languages,
   LogOut,
   MoonStar,
   Save,
@@ -21,14 +22,17 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 export default function SettingsScreen() {
   const { company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
+  const { locale, setLocale } = useLocale();
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
@@ -51,12 +55,12 @@ export default function SettingsScreen() {
 
   const handleSaveCompany = async () => {
     if (!company) {
-      Alert.alert('Bilgi', 'Düzenlenecek firma bulunamadı.');
+      Alert.alert(t.common.info, t.settings.companyNotFound);
       return;
     }
 
     if (!companyName.trim()) {
-      Alert.alert('Hata', 'Firma adı boş olamaz.');
+      Alert.alert(t.common.error, t.settings.companyNameRequired);
       return;
     }
 
@@ -79,11 +83,11 @@ export default function SettingsScreen() {
 
       await refreshCompany();
       setShowCompanyEditor(false);
-      Alert.alert('Başarılı', 'Firma bilgileri güncellendi.');
+      Alert.alert(t.common.success, t.settings.companyUpdated);
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Firma bilgileri kaydedilemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : t.settings.companySaveFailed
       );
     } finally {
       setSavingCompany(false);
@@ -92,7 +96,7 @@ export default function SettingsScreen() {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Hata', 'Yeni şifre en az 6 karakter olmalı.');
+      Alert.alert(t.common.error, t.settings.password.tooShort);
       return;
     }
 
@@ -107,11 +111,11 @@ export default function SettingsScreen() {
       }
 
       setNewPassword('');
-      Alert.alert('Başarılı', 'Şifreniz güncellendi.');
+      Alert.alert(t.common.success, t.settings.password.updated);
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Şifre değiştirilemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : t.settings.password.updateFailed
       );
     } finally {
       setSavingPassword(false);
@@ -124,33 +128,33 @@ export default function SettingsScreen() {
       router.replace('/login');
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Çıkış yapılamadı.'
+        t.common.error,
+        error instanceof Error ? error.message : t.settings.logoutFailed
       );
     }
   };
 
   const handleRequestAccountDeletion = () => {
     Alert.alert(
-      'Hesap silme talebi gönderilsin mi?',
-      'Bu işlem silme talebinizi kaydeder. Talep arka planda işlenecektir ve yasal saklama zorunluluğu olmayan veriler silinir veya anonimleştirilir.',
+      t.settings.deletion.confirmTitle,
+      t.settings.deletion.confirmText,
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Talep Gönder',
+          text: t.settings.deletion.confirmAction,
           onPress: async () => {
             setRequestingDeletion(true);
             try {
               await requestAccountDeletion(deletionReason);
               setDeletionReason('');
               Alert.alert(
-                'Talep Alındı',
-                'Hesap silme talebiniz kaydedildi. İşlem arka planda tamamlanacaktır.'
+                t.settings.deletion.receivedTitle,
+                t.settings.deletion.receivedText
               );
             } catch (error: unknown) {
               Alert.alert(
-                'Hata',
-                error instanceof Error ? error.message : 'Hesap silinemedi.'
+                t.common.error,
+                error instanceof Error ? error.message : t.settings.deletion.failed
               );
             } finally {
               setRequestingDeletion(false);
@@ -167,9 +171,9 @@ export default function SettingsScreen() {
       contentContainerStyle={styles.content}
     >
       <BrandHeroHeader
-        kicker="HESAP VE GÖRÜNÜM"
-        title="Ayarlar"
-        subtitle="Hesabını, firma bilgilerini ve deneyimini tek yerden yönet."
+        kicker={t.settings.kicker}
+        title={t.settings.title}
+        subtitle={t.settings.subtitle}
       >
         <TouchableOpacity
           style={[
@@ -188,49 +192,107 @@ export default function SettingsScreen() {
             <MoonStar size={18} color={theme.colors.primary} />
           )}
           <Text style={styles.themeToggleText}>
-            {mode === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'}
+            {mode === 'dark' ? t.settings.switchToLight : t.settings.switchToDark}
           </Text>
         </TouchableOpacity>
       </BrandHeroHeader>
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
+          <Languages size={20} color={theme.colors.primary} />
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.language}</Text>
+        </View>
+        <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
+          {t.settings.languageDescription}
+        </Text>
+
+        <View style={styles.optionRow}>
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor:
+                  locale === 'tr' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                borderColor:
+                  locale === 'tr' ? theme.colors.primary : theme.colors.border,
+              },
+            ]}
+            onPress={() => setLocale('tr')}
+          >
+            <Text
+              style={[
+                styles.languageOptionText,
+                { color: locale === 'tr' ? theme.colors.primaryStrong : theme.colors.text },
+              ]}
+            >
+              {t.common.languages.turkish}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.languageOption,
+              {
+                backgroundColor:
+                  locale === 'en' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                borderColor:
+                  locale === 'en' ? theme.colors.primary : theme.colors.border,
+              },
+            ]}
+            onPress={() => setLocale('en')}
+          >
+            <Text
+              style={[
+                styles.languageOptionText,
+                { color: locale === 'en' ? theme.colors.primaryStrong : theme.colors.text },
+              ]}
+            >
+              {t.common.languages.english}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={styles.cardHeader}>
           <Building2 size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Firma Bilgileri</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.companyInfo}</Text>
         </View>
         <TouchableOpacity
           style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
           onPress={() => setShowCompanyEditor((current) => !current)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {showCompanyEditor ? 'Firma Bilgilerini Gizle' : 'Firma Bilgilerini Güncelle'}
+            {showCompanyEditor
+              ? t.settings.hideCompanyEditor
+              : t.settings.showCompanyEditor}
           </Text>
         </TouchableOpacity>
 
         {showCompanyEditor ? (
           <View style={styles.editorSection}>
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adı</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.companyName}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={companyName}
               onChangeText={setCompanyName}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Vergi No</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.settings.fields.taxNumber}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={taxNumber}
               onChangeText={setTaxNumber}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Telefon</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.phone}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={phone}
               onChangeText={setPhone}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>E-posta</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.email}</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={email}
@@ -239,7 +301,7 @@ export default function SettingsScreen() {
               keyboardType="email-address"
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>Adres</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.address}</Text>
             <TextInput
               style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
               value={address}
@@ -255,7 +317,7 @@ export default function SettingsScreen() {
             >
               <Save size={18} color="#ffffff" />
               <Text style={styles.primaryButtonText}>
-                {savingCompany ? 'Kaydediliyor...' : 'Kaydet'}
+                {savingCompany ? t.common.saving : t.common.save}
               </Text>
             </TouchableOpacity>
           </View>
@@ -265,16 +327,16 @@ export default function SettingsScreen() {
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
           <KeyRound size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Şifre Değiştir</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.password.title}</Text>
         </View>
 
-        <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Şifre</Text>
+        <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.password}</Text>
         <TextInput
           style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
           value={newPassword}
           onChangeText={setNewPassword}
           secureTextEntry
-          placeholder="En az 6 karakter"
+          placeholder={t.settings.password.placeholder}
           placeholderTextColor={theme.colors.textSoft}
         />
 
@@ -285,7 +347,9 @@ export default function SettingsScreen() {
         >
           <KeyRound size={18} color="#ffffff" />
           <Text style={styles.primaryButtonText}>
-            {savingPassword ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
+            {savingPassword
+              ? t.settings.password.updating
+              : t.settings.password.action}
           </Text>
         </TouchableOpacity>
       </View>
@@ -293,12 +357,10 @@ export default function SettingsScreen() {
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
           <Info size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Hakkimizda</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.about.title}</Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          CepteCari ile borç ve alacak takibini kolayca yönetin. Esnaflar ve
-          bireysel kullanıcılar için geliştirilen bu pratik uygulama sayesinde
-          tüm hesaplarınız artık cebinizde.
+          {t.settings.about.text}
         </Text>
 
         <TouchableOpacity
@@ -306,7 +368,7 @@ export default function SettingsScreen() {
           onPress={() => router.push('/privacy-policy' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            Gizlilik Politikasını Aç
+            {t.settings.about.privacy}
           </Text>
         </TouchableOpacity>
 
@@ -315,7 +377,7 @@ export default function SettingsScreen() {
           onPress={() => router.push('/account-deletion' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            Hesap Silme Bilgilerini Aç
+            {t.settings.about.deletionInfo}
           </Text>
         </TouchableOpacity>
       </View>
@@ -324,17 +386,16 @@ export default function SettingsScreen() {
         <View style={styles.cardHeader}>
           <Trash2 size={20} color={theme.colors.danger} />
           <Text style={[styles.dangerCardTitle, { color: theme.colors.danger }]}>
-            Hesap Silme
+            {t.settings.deletion.title}
           </Text>
         </View>
 
         <Text style={[styles.dangerText, { color: theme.colors.danger }]}>
-          Buradan hesap silme talebi oluşturabilirsiniz. Talep kaydedildikten
-          sonra backend tarafında işlenir ve geri dönülemeyebilir.
+          {t.settings.deletion.text}
         </Text>
 
         <Text style={[styles.label, { color: theme.colors.textMuted }]}>
-          Silme Nedeni (Opsiyonel)
+          {t.settings.fields.deletionReason}
         </Text>
         <TextInput
           style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text }]}
@@ -342,15 +403,14 @@ export default function SettingsScreen() {
           onChangeText={setDeletionReason}
           multiline
           numberOfLines={4}
-          placeholder="Talebinizle ilgili kısa bir not yazabilirsiniz."
+          placeholder={t.settings.deletion.placeholder}
           placeholderTextColor={theme.colors.textSoft}
         />
 
         <View style={styles.inlineInfo}>
           <FileLock2 size={16} color={theme.colors.danger} />
           <Text style={[styles.inlineInfoText, { color: theme.colors.danger }]}>
-            İşlem tamamlandığında size ait hesap verileri silinir veya
-            anonimleştirilir.
+            {t.settings.deletion.inlineInfo}
           </Text>
         </View>
 
@@ -361,7 +421,9 @@ export default function SettingsScreen() {
         >
           <Trash2 size={18} color="#ffffff" />
           <Text style={styles.dangerButtonText}>
-            {requestingDeletion ? 'Talep Gönderiliyor...' : 'Hesap Silme Talebi Gönder'}
+            {requestingDeletion
+              ? t.settings.deletion.requesting
+              : t.settings.deletion.action}
           </Text>
         </TouchableOpacity>
       </View>
@@ -371,7 +433,7 @@ export default function SettingsScreen() {
         onPress={handleSignOut}
       >
         <LogOut size={18} color="#ffffff" />
-        <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
+        <Text style={styles.logoutButtonText}>{t.settings.logout}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -382,7 +444,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
+    padding: 16,
     paddingTop: 0,
     paddingBottom: 40,
   },
@@ -460,7 +522,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 11,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -471,10 +533,14 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   card: {
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
     borderWidth: 1,
     marginBottom: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -494,7 +560,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
     fontSize: 15,
   },
@@ -507,8 +573,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 18,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -523,8 +589,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   secondaryButton: {
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 15,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -536,6 +602,23 @@ const styles = StyleSheet.create({
   secondaryButtonSpacing: {
     marginTop: 10,
   },
+  optionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  languageOption: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageOptionText: {
+    ...typography.heading,
+    fontSize: 15,
+  },
   aboutText: {
     ...typography.body,
     fontSize: 14,
@@ -543,10 +626,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dangerCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
     borderWidth: 1,
     marginBottom: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 2,
   },
   dangerCardTitle: {
     ...typography.heading,
@@ -572,8 +659,8 @@ const styles = StyleSheet.create({
   },
   dangerButton: {
     marginTop: 18,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -586,12 +673,16 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.14,
+    shadowRadius: 18,
+    elevation: 3,
   },
   logoutButtonText: {
     ...typography.heading,

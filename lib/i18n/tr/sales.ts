@@ -1,0 +1,27 @@
+export const trSales = {
+  title: 'Satışlar',
+  kicker: 'SATIŞ YÖNETİMİ',
+  heroSubtitle: 'Satış kayıtlarını oluşturun, stok hareketlerini otomatik izleyin.',
+  empty: 'Henüz satış yok',
+  newSale: 'Yeni Satış',
+  create: 'Satış Oluştur',
+  creating: 'Oluşturuluyor...',
+  customerSelect: 'Müşteri Seçin',
+  noCustomer: 'Müşteri yok',
+  productSelect: 'Ürün Seçin',
+  productAdd: 'Ürün Ekle',
+  noProduct: 'Ürün yok',
+  detailsEmpty: 'Detay bulunmuyor',
+  total: 'Toplam',
+  stockInsufficientTitle: 'Stok yetersiz',
+  stockInsufficientSingle: '{{product}} için mevcut stok miktarı aşılamaz.',
+  stockInsufficientMax:
+    '{{product}} için en fazla {{stock}} {{unit}} seçebilirsiniz.',
+  customerRequired: 'Lütfen müşteri seçin.',
+  productRequired: 'Lütfen en az bir ürün ekleyin.',
+  createFailed: 'Satış oluşturulamadı.',
+  deleteFailed: 'Satış silinemedi.',
+  deleteConfirmTitle: 'Satış silinsin mi?',
+  deleteConfirmText:
+    'Bu satış kaydı silinecek ve stok miktarı otomatik olarak geri eklenecek.',
+} as const;

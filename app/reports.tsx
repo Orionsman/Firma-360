@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { formatTRY } from '@/lib/format';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 type MonthlyChartDatum = {
@@ -200,7 +201,7 @@ export default function ReportsScreen() {
     ) => {
       const topItems = items.slice(0, 3);
       const otherTotal = items.slice(3).reduce((sum, item) => sum + item.value, 0);
-      const merged = otherTotal ? [...topItems, { label: 'Diğer', value: otherTotal }] : topItems;
+      const merged = otherTotal ? [...topItems, { label: t.reports.other, value: otherTotal }] : topItems;
       return merged.map((item, index) => ({
         ...item,
         color: palette[index % palette.length],
@@ -249,9 +250,9 @@ export default function ReportsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <BrandHeroHeader
-          kicker="ANALİTİK ÖZET"
-          title="Raporlar"
-          subtitle="CepteCari genel durum özeti"
+          kicker={t.reports.kicker}
+          title={t.reports.title}
+          subtitle={t.reports.subtitle}
           rightAccessory={
             <TouchableOpacity style={styles.heroBack} onPress={() => router.back()}>
               <ArrowLeft size={18} color="#fff" />
@@ -261,30 +262,30 @@ export default function ReportsScreen() {
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>Toplam Alacak:</Text>
+            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>{t.reports.totalReceivables}:</Text>
             <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{formatTRY(receivables)}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: theme.colors.border }]} />
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>Toplam Borç:</Text>
+            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>{t.reports.totalPayables}:</Text>
             <Text style={[styles.summaryValue, { color: theme.colors.danger }]}>{formatTRY(payables)}</Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Aylik Gelir & Gider</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.reports.monthlyIncomeExpense}</Text>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#3CB7FF' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Satış</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{t.reports.sales}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#59C356' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Tahsilat</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{t.reports.collections}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#FF6468' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Ödeme</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{t.reports.payments}</Text>
             </View>
           </View>
 
@@ -339,7 +340,7 @@ export default function ReportsScreen() {
 
         <View style={styles.distributionRow}>
           <View style={[styles.distributionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Alacak Dagilimi</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.reports.receivableDistribution}</Text>
             <View style={styles.donutWrap}>
               <Svg width={120} height={120} viewBox="0 0 120 120">
                 <Circle cx="60" cy="60" r="44" stroke={theme.colors.border} strokeWidth="22" fill="none" />
@@ -374,7 +375,7 @@ export default function ReportsScreen() {
           </View>
 
           <View style={[styles.distributionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Borç Dağılımı</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.reports.payableDistribution}</Text>
             <View style={styles.donutWrap}>
               <Svg width={120} height={120} viewBox="0 0 120 120">
                 <Circle cx="60" cy="60" r="44" stroke={theme.colors.border} strokeWidth="22" fill="none" />
@@ -412,13 +413,13 @@ export default function ReportsScreen() {
         <View style={[styles.footerNote, { backgroundColor: theme.colors.surfaceMuted }]}>
           <TrendingUp size={18} color={theme.colors.success} />
           <Text style={[styles.footerText, { color: theme.colors.textMuted }]}>
-            Aylık grafik satış, tahsilat ve ödeme hareketlerinden oluşturulur.
+            {t.reports.footerSales}
           </Text>
         </View>
         <View style={[styles.footerNote, { backgroundColor: theme.colors.surfaceMuted }]}>
           <TrendingDown size={18} color={theme.colors.danger} />
           <Text style={[styles.footerText, { color: theme.colors.textMuted }]}>
-            Dağılım kartları en yüksek paya sahip hesapları ve diğer grubunu gösterir.
+            {t.reports.footerDistribution}
           </Text>
         </View>
       </ScrollView>

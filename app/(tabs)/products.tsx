@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { formatTRY } from '@/lib/format';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -55,10 +56,7 @@ export default function Products() {
 
   const ensureCompany = () => {
     if (!company) {
-      Alert.alert(
-        'Firma gerekli',
-        'Önce ana sayfadaki firma kurulum kartından firmanızı oluşturmanız gerekiyor.'
-      );
+      Alert.alert(t.common.companyRequiredTitle, t.common.companyRequiredText);
       return false;
     }
 
@@ -78,7 +76,7 @@ export default function Products() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      Alert.alert('Hata', error.message);
+      Alert.alert(t.common.error, error.message);
       return;
     }
 
@@ -97,7 +95,7 @@ export default function Products() {
 
   const handleAdd = async () => {
     if (!formData.name.trim()) {
-      Alert.alert('Hata', 'Lütfen ürün adı girin.');
+      Alert.alert(t.common.error, t.products.nameRequired);
       return;
     }
 
@@ -135,8 +133,8 @@ export default function Products() {
       await fetchProducts();
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Ürün kaydedilemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : t.products.saveFailed
       );
     } finally {
       setSaving(false);
@@ -163,12 +161,25 @@ export default function Products() {
       await fetchProducts();
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Ürün silinemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : t.products.deleteFailed
       );
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const confirmDelete = (product: Product) => {
+    Alert.alert(t.products.deleteConfirmTitle, t.products.deleteConfirmText, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.common.delete,
+        style: 'destructive',
+        onPress: () => {
+          void handleDelete(product);
+        },
+      },
+    ]);
   };
 
   const renderItem = ({ item }: { item: Product }) => {
@@ -200,11 +211,13 @@ export default function Products() {
         <View style={styles.itemContent}>
           <Text style={[styles.itemName, { color: theme.colors.text }]}>{item.name}</Text>
           {item.code ? (
-            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>Kod: {item.code}</Text>
+            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>
+              {t.products.codeLabel}: {item.code}
+            </Text>
           ) : null}
-          <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>
-            Stok: {item.stock_quantity} {item.unit}
-          </Text>
+            <Text style={[styles.itemDetail, { color: theme.colors.textMuted }]}>
+              {t.common.entities.stock}: {item.stock_quantity} {item.unit}
+            </Text>
         </View>
         <View style={styles.itemPrice}>
           <Text style={[styles.priceText, { color: theme.colors.text }]}>
@@ -214,12 +227,12 @@ export default function Products() {
         </View>
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={() => handleDelete(item)}
+          onPress={() => confirmDelete(item)}
           disabled={deletingId === item.id}
           hitSlop={8}
         >
           <Trash2 size={18} color="#ef4444" />
-          <Text style={styles.deleteText}>Sil</Text>
+          <Text style={styles.deleteText}>{t.common.delete}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -228,8 +241,8 @@ export default function Products() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <BrandHeroHeader
-        kicker="STOK MERKEZİ"
-        brandSubtitle="Ürün, fiyat ve minimum stok seviyelerini yönetin."
+        kicker={t.products.kicker}
+        brandSubtitle={t.products.heroSubtitle}
         rightAccessory={
           <TouchableOpacity
             onPress={() => {
@@ -256,7 +269,7 @@ export default function Products() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Package size={48} color={theme.colors.textSoft} />
-            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henüz ürün yok</Text>
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.products.empty}</Text>
           </View>
         }
       />
@@ -265,7 +278,7 @@ export default function Products() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Ürün</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.products.newProduct}</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
@@ -276,7 +289,7 @@ export default function Products() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ürün Adı *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.productName} *</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -286,7 +299,7 @@ export default function Products() {
                       color: theme.colors.text,
                     },
                   ]}
-                  placeholder="Ürün adı"
+                  placeholder={t.products.productName}
                   placeholderTextColor={theme.colors.textSoft}
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
@@ -294,7 +307,7 @@ export default function Products() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Ürün Kodu</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.productCode}</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -313,7 +326,7 @@ export default function Products() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, styles.halfInputLeft]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Birim</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.unit}</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -330,7 +343,7 @@ export default function Products() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Stok Miktarı</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.stockQuantity}</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -353,7 +366,7 @@ export default function Products() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, styles.halfInputLeft]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Alış Fiyatı</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.purchasePrice}</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -373,7 +386,7 @@ export default function Products() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.halfInputRight]}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>Satış Fiyatı</Text>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.salePrice}</Text>
                   <TextInput
                     style={[
                       styles.input,
@@ -395,7 +408,7 @@ export default function Products() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Min. Stok Seviyesi</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.minStockLevel}</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -425,7 +438,7 @@ export default function Products() {
                 disabled={saving}
               >
                 <Text style={styles.submitButtonText}>
-                  {saving ? 'Kaydediliyor...' : 'Kaydet'}
+                  {saving ? t.common.saving : t.common.save}
                 </Text>
               </TouchableOpacity>
             </ScrollView>

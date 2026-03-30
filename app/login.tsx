@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { FirmaLogo } from '@/components/FirmaLogo';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 export default function Login() {
@@ -29,7 +30,7 @@ export default function Login() {
     setErrorMessage('');
 
     if (!email || !password) {
-      setErrorMessage('Lütfen tüm alanları doldurun.');
+      setErrorMessage(t.auth.login.emailRequired);
       return;
     }
 
@@ -39,7 +40,7 @@ export default function Login() {
       router.replace('/(tabs)');
     } catch (error: unknown) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Giriş sırasında bir hata oluştu.'
+        error instanceof Error ? error.message : t.auth.login.failed
       );
     } finally {
       setLoading(false);
@@ -75,15 +76,17 @@ export default function Login() {
               <FirmaLogo size="md" showWordmark={false} />
             </View>
             <View style={styles.heroTextBlock}>
-              <Text style={[styles.title, { color: theme.colors.text }]}>CepteCari</Text>
+              <Text style={[styles.title, { color: theme.colors.text }]}>{t.auth.appName}</Text>
               <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
-                Cari takibin cebinde
+                {t.auth.appSubtitle}
               </Text>
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
             <ShieldCheck size={16} color={theme.colors.primary} />
-            <Text style={[styles.badgeText, { color: theme.colors.text }]}>Güvenli giriş</Text>
+            <Text style={[styles.badgeText, { color: theme.colors.text }]}>
+              {t.auth.login.secureEntry}
+            </Text>
           </View>
         </View>
 
@@ -97,9 +100,9 @@ export default function Login() {
             },
           ]}
         >
-          <Text style={[styles.formTitle, { color: theme.colors.text }]}>Hesabına giriş yap</Text>
+          <Text style={[styles.formTitle, { color: theme.colors.text }]}>{t.auth.login.title}</Text>
           <Text style={[styles.formSubtitle, { color: theme.colors.textMuted }]}>
-            Esnaflar ve bireysel kullanıcılar için pratik cari takibi.
+            {t.auth.login.subtitle}
           </Text>
 
           {!!errorMessage ? (
@@ -118,7 +121,7 @@ export default function Login() {
             </View>
           ) : null}
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>E-posta</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.email}</Text>
           <TextInput
             style={[
               styles.input,
@@ -137,7 +140,7 @@ export default function Login() {
             autoCorrect={false}
           />
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Şifre</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.password}</Text>
           <TextInput
             style={[
               styles.input,
@@ -165,17 +168,19 @@ export default function Login() {
             disabled={loading}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+              {loading ? t.auth.login.signingIn : t.auth.login.signIn}
             </Text>
             {!loading ? <ArrowRight size={18} color="#fff" /> : null}
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: theme.colors.textSoft }]}>
-              Hesabın yok mu?{' '}
+              {t.auth.login.noAccount}{' '}
             </Text>
             <TouchableOpacity onPress={() => router.push('/register')}>
-              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>Kayıt Ol</Text>
+              <Text style={[styles.link, { color: theme.colors.primaryStrong }]}>
+                {t.auth.login.register}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

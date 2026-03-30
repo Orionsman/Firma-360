@@ -19,6 +19,7 @@ import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
 import { formatTRY } from '@/lib/format';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -61,6 +62,12 @@ interface SaleItem {
   unit: string;
 }
 
+const interpolate = (template: string, values: Record<string, string | number>) =>
+  Object.entries(values).reduce(
+    (text, [key, value]) => text.replace(`{{${key}}}`, String(value)),
+    template
+  );
+
 export default function Sales() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
@@ -84,10 +91,7 @@ export default function Sales() {
 
   const ensureCompany = () => {
     if (!company) {
-      Alert.alert(
-        'Firma gerekli',
-        'Önce ana sayfadaki firma kurulum kartından firmanızı oluşturmanız gerekiyor.'
-      );
+      Alert.alert(t.common.companyRequiredTitle, t.common.companyRequiredText);
       return false;
     }
 
@@ -109,11 +113,11 @@ export default function Sales() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      Alert.alert('Hata', error.message);
+      Alert.alert(t.common.error, error.message);
       return;
     }
 
-    setSales(((data as unknown) as Sale[]) ?? []);
+    setSales((data as unknown as Sale[]) ?? []);
   }, [company]);
 
   const fetchCustomers = useCallback(async () => {
@@ -157,7 +161,7 @@ export default function Sales() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchSales();
+    await Promise.all([fetchSales(), fetchCustomers(), fetchProducts()]);
     setRefreshing(false);
   };
 
@@ -167,8 +171,10 @@ export default function Sales() {
     if (existing) {
       if (existing.quantity >= existing.availableStock) {
         Alert.alert(
-          'Stok yetersiz',
-          `${product.name} için mevcut stok miktarı aşılamaz.`
+          t.sales.stockInsufficientTitle,
+          interpolate(t.sales.stockInsufficientSingle, {
+            product: product.name,
+          })
         );
         return;
       }
@@ -215,8 +221,12 @@ export default function Sales() {
     const currentItem = saleItems.find((item) => item.productId === productId);
     if (currentItem && quantity > currentItem.availableStock) {
       Alert.alert(
-        'Stok yetersiz',
-        `${currentItem.productName} için en fazla ${currentItem.availableStock} ${currentItem.unit} seçebilirsiniz.`
+        t.sales.stockInsufficientTitle,
+        interpolate(t.sales.stockInsufficientMax, {
+          product: currentItem.productName,
+          stock: currentItem.availableStock,
+          unit: currentItem.unit,
+        })
       );
       return;
     }
@@ -235,12 +245,12 @@ export default function Sales() {
 
   const handleCreateSale = async () => {
     if (!selectedCustomer) {
-      Alert.alert('Hata', 'Lütfen müşteri seçin.');
+      Alert.alert(t.common.error, t.sales.customerRequired);
       return;
     }
 
     if (saleItems.length === 0) {
-      Alert.alert('Hata', 'Lütfen en az bir ürün ekleyin.');
+      Alert.alert(t.common.error, t.sales.productRequired);
       return;
     }
 
@@ -284,8 +294,8 @@ export default function Sales() {
       await Promise.all([fetchSales(), fetchProducts(), fetchCustomers()]);
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Satış oluşturulamadı.'
+        t.common.error,
+        error instanceof Error ? error.message : t.sales.createFailed
       );
     } finally {
       setSaving(false);
@@ -311,12 +321,25 @@ export default function Sales() {
       await Promise.all([fetchSales(), fetchProducts(), fetchCustomers()]);
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Satış silinemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : t.sales.deleteFailed
       );
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const confirmDeleteSale = (sale: Sale) => {
+    Alert.alert(t.sales.deleteConfirmTitle, t.sales.deleteConfirmText, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.common.delete,
+        style: 'destructive',
+        onPress: () => {
+          void handleDeleteSale(sale);
+        },
+      },
+    ]);
   };
 
   const getRelationItem = <T,>(value?: T | T[] | null): T | null => {
@@ -331,12 +354,19 @@ export default function Sales() {
     <View
       style={[
         styles.listItem,
-        { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+          shadowColor: theme.colors.shadow,
+        },
       ]}
     >
+      <View style={[styles.saleIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+        <ShoppingCart size={20} color={theme.colors.primary} />
+      </View>
       <View style={styles.itemContent}>
         <Text style={[styles.itemCustomerLarge, { color: theme.colors.text }]}>
-          {getRelationItem(item.customers)?.name || 'Müşteri yok'}
+          {getRelationItem(item.customers)?.name || t.sales.noCustomer}
         </Text>
         <Text style={[styles.itemDate, { color: theme.colors.textSoft }]}>
           {new Date(item.sale_date).toLocaleDateString('tr-TR')}
@@ -345,7 +375,7 @@ export default function Sales() {
           {item.sale_items
             ?.map((saleItem) => getRelationItem(saleItem.products)?.name)
             .filter(Boolean)
-            .join(', ') || 'Ürün yok'}
+            .join(', ') || t.sales.noProduct}
         </Text>
         <Text style={[styles.itemDetails, { color: theme.colors.textSoft }]}>
           {item.sale_items
@@ -359,7 +389,7 @@ export default function Sales() {
               const totalPrice = Number(saleItem.total_price || 0).toLocaleString('tr-TR');
               return `${quantity}${unit} x ${unitPrice} = ${totalPrice}`;
             })
-            .join(' | ') || 'Detay yok'}
+            .join(' | ') || t.sales.detailsEmpty}
         </Text>
       </View>
       <View style={styles.itemRight}>
@@ -368,26 +398,25 @@ export default function Sales() {
         </Text>
       </View>
       <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteSale(item)}
+        style={[styles.deleteButton, { backgroundColor: theme.colors.dangerSoft }]}
+        onPress={() => confirmDeleteSale(item)}
         disabled={deletingId === item.id}
         hitSlop={8}
       >
         <Trash2 size={18} color="#ef4444" />
-        <Text style={styles.deleteText}>Sil</Text>
       </TouchableOpacity>
     </View>
   );
 
   const selectedCustomerName =
     customers.find((customer) => customer.id === selectedCustomer)?.name ||
-    'Seciniz';
+    t.common.selectPlaceholder;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <BrandHeroHeader
-        kicker="SATIŞ AKIŞI"
-        brandSubtitle="Satış fişlerini oluşturun ve stok düşüşünü otomatik izleyin."
+        kicker={t.sales.kicker}
+        brandSubtitle={t.sales.heroSubtitle}
         rightAccessory={
           <TouchableOpacity
             onPress={() => {
@@ -417,9 +446,16 @@ export default function Sales() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <ShoppingCart size={48} color={theme.colors.textSoft} />
-            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>Henüz satış yok</Text>
+          <View
+            style={[
+              styles.emptyState,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <View style={[styles.emptyIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+              <ShoppingCart size={30} color={theme.colors.primary} />
+            </View>
+            <Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.sales.empty}</Text>
           </View>
         }
       />
@@ -427,7 +463,7 @@ export default function Sales() {
       <Modal visible={modalVisible} animationType="slide">
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Yeni Satış</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.sales.newSale}</Text>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
               <X size={24} color={theme.colors.textMuted} />
             </TouchableOpacity>
@@ -439,7 +475,7 @@ export default function Sales() {
             keyboardShouldPersistTaps="handled"
           >
             <DateField
-              label="Tarih"
+              label={t.common.fields.date}
               value={saleDate}
               onChange={setSaleDate}
               textColor={theme.colors.text}
@@ -453,12 +489,12 @@ export default function Sales() {
               style={[styles.pickerButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
               onPress={() => setShowCustomerPicker(true)}
             >
-              <Text style={[styles.pickerLabel, { color: theme.colors.textMuted }]}>Müşteri</Text>
+              <Text style={[styles.pickerLabel, { color: theme.colors.textMuted }]}>{t.common.entities.customer}</Text>
               <Text style={[styles.pickerValue, { color: theme.colors.text }]}>{selectedCustomerName}</Text>
             </TouchableOpacity>
 
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Ürünler</Text>
+              <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t.common.entities.products}</Text>
               {saleItems.map((item) => (
                 <View
                   key={item.productId}
@@ -516,12 +552,12 @@ export default function Sales() {
                 onPress={() => setShowProductPicker(true)}
               >
                 <Plus size={20} color={theme.colors.primary} />
-                <Text style={[styles.addProductText, { color: theme.colors.primary }]}>Ürün Ekle</Text>
+                <Text style={[styles.addProductText, { color: theme.colors.primary }]}>{t.sales.productAdd}</Text>
               </TouchableOpacity>
             </View>
 
             <View style={[styles.totalSection, { backgroundColor: theme.colors.surfaceMuted }]}>
-              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>Toplam</Text>
+              <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>{t.sales.total}</Text>
               <Text style={[styles.totalAmount, { color: theme.colors.text }]}>
                 {formatTRY(getTotalAmount())}
               </Text>
@@ -543,7 +579,7 @@ export default function Sales() {
               disabled={saving}
             >
               <Text style={styles.createButtonText}>
-                {saving ? 'Oluşturuluyor...' : 'Satış Oluştur'}
+                {saving ? t.sales.creating : t.sales.create}
               </Text>
             </TouchableOpacity>
           </View>
@@ -553,7 +589,7 @@ export default function Sales() {
           <View style={styles.pickerModal}>
             <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Müşteri Seçin</Text>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.sales.customerSelect}</Text>
                 <TouchableOpacity onPress={() => setShowCustomerPicker(false)}>
                   <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
@@ -586,7 +622,7 @@ export default function Sales() {
           <View style={styles.pickerModal}>
             <View style={[styles.pickerContent, { backgroundColor: theme.colors.surface }]}>
               <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Ürün Seçin</Text>
+                <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.sales.productSelect}</Text>
                 <TouchableOpacity onPress={() => setShowProductPicker(false)}>
                   <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
@@ -604,7 +640,7 @@ export default function Sales() {
                         {item.name}
                       </Text>
                       <Text style={[styles.pickerItemDetail, { color: theme.colors.textMuted }]}>
-                        Stok: {item.stock_quantity} {item.unit}
+                        {t.common.entities.stock}: {item.stock_quantity} {item.unit}
                       </Text>
                     </View>
                     <Text style={[styles.pickerItemPrice, { color: theme.colors.text }]}>
@@ -643,11 +679,16 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#3b82f6',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 4,
   },
   addSaleIcon: {
     width: 24,
@@ -668,14 +709,27 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 16,
+    paddingBottom: 28,
   },
   listItem: {
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  saleIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   itemContent: {
     flex: 1,
@@ -687,7 +741,7 @@ const styles = StyleSheet.create({
   },
   itemDate: {
     ...typography.caption,
-    fontSize: 12,
+    fontSize: 13,
     marginBottom: 6,
   },
   itemProductNames: {
@@ -698,6 +752,7 @@ const styles = StyleSheet.create({
   itemDetails: {
     ...typography.caption,
     fontSize: 13,
+    lineHeight: 19,
   },
   itemRight: {
     alignItems: 'flex-end',
@@ -706,30 +761,36 @@ const styles = StyleSheet.create({
   itemAmount: {
     ...typography.heading,
     fontSize: 18,
-    marginBottom: 8,
   },
   deleteButton: {
-    minWidth: 52,
-    paddingVertical: 6,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-  },
-  deleteText: {
-    ...typography.label,
-    fontSize: 12,
-    color: '#ef4444',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 64,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderRadius: 22,
+  },
+  emptyIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     ...typography.body,
     fontSize: 16,
     color: '#94a3b8',
     marginTop: 16,
+    lineHeight: 23,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -752,7 +813,7 @@ const styles = StyleSheet.create({
   },
   pickerButton: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 24,
   },
@@ -775,10 +836,10 @@ const styles = StyleSheet.create({
   saleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 16,
+    marginBottom: 10,
   },
   saleItemContent: {
     flex: 1,
@@ -796,7 +857,7 @@ const styles = StyleSheet.create({
   quantityButton: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -822,7 +883,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
     borderWidth: 2,
-    borderRadius: 12,
+    borderRadius: 16,
     borderStyle: 'dashed',
     gap: 8,
   },
@@ -835,7 +896,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   totalLabel: {
     ...typography.heading,
@@ -851,7 +914,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#e2e8f0',
   },
   createButton: {
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     alignItems: 'center',
   },
