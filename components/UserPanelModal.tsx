@@ -47,17 +47,17 @@ type MenuItem = {
 };
 
 const companyItems: MenuItem[] = [
-  { key: 'company', label: 'İşletme Bilgileri', icon: Building2 },
+  { key: 'company', label: 'Isletme Bilgileri', icon: Building2 },
 ];
 
 const accountItems: MenuItem[] = [
-  { key: 'accountSettings', label: 'Hesap Ayarları', icon: UserRound },
-  { key: 'security', label: 'Şifre Yönetimi', icon: ShieldCheck },
-  { key: 'delete', label: 'Hesabı Sil', icon: Trash2, tone: 'danger' },
+  { key: 'accountSettings', label: 'Hesap Ayarlari', icon: UserRound },
+  { key: 'security', label: 'Sifre Yonetimi', icon: ShieldCheck },
+  { key: 'delete', label: 'Hesabi Sil', icon: Trash2, tone: 'danger' },
 ];
 
 export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
-  const { user, company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
+  const { user, company, signOut, refreshCompany, deleteAccount } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
   const [activeSection, setActiveSection] = useState<PanelSection | null>(null);
   const [companyName, setCompanyName] = useState('');
@@ -69,7 +69,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   const [deletionReason, setDeletionReason] = useState('');
   const [savingCompany, setSavingCompany] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     setCompanyName(company?.name || '');
@@ -100,12 +100,12 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 
   const handleSaveCompany = async () => {
     if (!company) {
-      Alert.alert('Bilgi', 'Düzenlenecek firma bulunamadı.');
+      Alert.alert('Bilgi', 'Duzenlenecek firma bulunamadi.');
       return;
     }
 
     if (!companyName.trim()) {
-      Alert.alert('Hata', 'Firma adı boş olamaz.');
+      Alert.alert('Hata', 'Firma adi bos olamaz.');
       return;
     }
 
@@ -127,7 +127,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       }
 
       await refreshCompany();
-      Alert.alert('Başarılı', 'Firma bilgileri güncellendi.');
+      Alert.alert('Basarili', 'Firma bilgileri guncellendi.');
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
@@ -140,7 +140,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Hata', 'Yeni şifre en az 6 karakter olmalı.');
+      Alert.alert('Hata', 'Yeni sifre en az 6 karakter olmali.');
       return;
     }
 
@@ -155,11 +155,11 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       }
 
       setNewPassword('');
-      Alert.alert('Başarılı', 'Şifreniz güncellendi.');
+      Alert.alert('Basarili', 'Sifreniz guncellendi.');
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Şifre değiştirilemedi.'
+        error instanceof Error ? error.message : 'Sifre degistirilemedi.'
       );
     } finally {
       setSavingPassword(false);
@@ -174,35 +174,35 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
     } catch (error: unknown) {
       Alert.alert(
         'Hata',
-        error instanceof Error ? error.message : 'Çıkış yapılamadı.'
+        error instanceof Error ? error.message : 'Cikis yapilamadi.'
       );
     }
   };
 
-  const handleRequestAccountDeletion = () => {
+  const handleDeleteAccount = () => {
     Alert.alert(
-      'Hesap silme talebi gönderilsin mi?',
-      'Bu işlem silme talebinizi kaydeder. Talep arka planda işlenecektir ve uygun veriler silinir veya anonimleştirilir.',
+      'Hesap kalici olarak silinsin mi?',
+      'Bu islem geri alinamaz. Hesabiniz ve ona bagli veriler silinir veya anonimlestirilir.',
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Vazgec', style: 'cancel' },
         {
-          text: 'Talep Gönder',
+          text: 'Hesabi Sil',
+          style: 'destructive',
           onPress: async () => {
-            setRequestingDeletion(true);
+            setDeletingAccount(true);
             try {
-              await requestAccountDeletion(deletionReason);
+              await deleteAccount(deletionReason);
               setDeletionReason('');
-              Alert.alert(
-                'Talep Alındı',
-                'Hesap silme talebiniz kaydedildi. İşlem arka planda tamamlanacaktır.'
-              );
+              Alert.alert('Hesap Silindi', 'Hesabiniz basariyla silindi.');
+              onClose();
+              router.replace('/login');
             } catch (error: unknown) {
               Alert.alert(
                 'Hata',
                 error instanceof Error ? error.message : 'Hesap silinemedi.'
               );
             } finally {
-              setRequestingDeletion(false);
+              setDeletingAccount(false);
             }
           },
         },
@@ -223,9 +223,9 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>İşletme Bilgileri</Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Isletme Bilgileri</Text>
 
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adı</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adi</Text>
           <TextInput
             style={[
               styles.input,
@@ -326,12 +326,12 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Hesap Ayarları</Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Hesap Ayarlari</Text>
           <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>E-posta</Text>
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>{user?.email || '-'}</Text>
           <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>Firma</Text>
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {company?.name || 'Firma oluşturulmamış'}
+            {company?.name || 'Firma olusturulmamis'}
           </Text>
 
           <TouchableOpacity
@@ -342,7 +342,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             onPress={() => router.push('/privacy-policy' as never)}
           >
             <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              Gizlilik Politikasını Aç
+              Gizlilik Politikasini Ac
             </Text>
           </TouchableOpacity>
 
@@ -355,7 +355,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             onPress={() => router.push('/account-deletion' as never)}
           >
             <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              Hesap Silme Bilgilerini Aç
+              Hesap Silme Bilgilerini Ac
             </Text>
           </TouchableOpacity>
         </View>
@@ -370,8 +370,8 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Şifre Yönetimi</Text>
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Şifre</Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Sifre Yonetimi</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Sifre</Text>
           <TextInput
             style={[
               styles.input,
@@ -399,7 +399,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
           >
             <KeyRound size={16} color="#fff" />
             <Text style={styles.primaryButtonText}>
-              {savingPassword ? 'Güncelleniyor...' : 'Şifreyi Güncelle'}
+              {savingPassword ? 'Guncelleniyor...' : 'Sifreyi Guncelle'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -414,9 +414,9 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
           { backgroundColor: theme.colors.dangerSoft, borderTopColor: theme.colors.danger },
         ]}
       >
-        <Text style={[styles.detailTitle, styles.dangerTitle]}>Hesabı Sil</Text>
+        <Text style={[styles.detailTitle, styles.dangerTitle]}>Hesabi Kalici Olarak Sil</Text>
         <Text style={styles.dangerText}>
-          Silme talebi backend tarafında işlenir. Uygun veriler silinir veya anonimleştirilir.
+          Bu islem geri alinamaz. Hesabiniz ve iliskili uygulama verileri silinir veya anonimlestirilir.
         </Text>
 
         <Text style={[styles.label, { color: theme.colors.textMuted }]}>Silme Nedeni</Text>
@@ -434,14 +434,14 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
           onChangeText={setDeletionReason}
           multiline
           numberOfLines={4}
-          placeholder="Talebinizle ilgili kısa bir not yazabilirsiniz."
+          placeholder="Silme islemiyle ilgili kisa bir not yazabilirsiniz."
           placeholderTextColor={theme.colors.textSoft}
         />
 
         <View style={styles.inlineInfo}>
           <FileLock2 size={16} color={theme.colors.danger} />
           <Text style={[styles.inlineInfoText, { color: theme.colors.danger }]}>
-            Talep oluştuktan sonra süreç arka planda tamamlanır.
+            Islem tamamlandiginda cikis yapilir ve hesaba yeniden erisilemez.
           </Text>
         </View>
 
@@ -449,14 +449,14 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
           style={[
             styles.dangerButton,
             { backgroundColor: theme.colors.danger },
-            requestingDeletion && styles.buttonDisabled,
+            deletingAccount && styles.buttonDisabled,
           ]}
-          onPress={handleRequestAccountDeletion}
-          disabled={requestingDeletion}
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
         >
           <Trash2 size={16} color="#fff" />
           <Text style={styles.primaryButtonText}>
-            {requestingDeletion ? 'Talep Gönderiliyor...' : 'Silme Talebi Gönder'}
+            {deletingAccount ? 'Hesap Siliniyor...' : 'Hesabi Kalici Olarak Sil'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -539,7 +539,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.groupLabel, { color: theme.colors.textSoft }]}>İŞLETME</Text>
+            <Text style={[styles.groupLabel, { color: theme.colors.textSoft }]}>ISLETME</Text>
             <View style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}>
               {companyItems.map(renderMenuItem)}
             </View>
@@ -556,7 +556,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             >
               <View style={styles.menuItemLeft}>
                 <LogOut size={18} color={theme.colors.danger} />
-                <Text style={[styles.menuItemText, styles.dangerMenuText]}>Çıkış Yap</Text>
+                <Text style={[styles.menuItemText, styles.dangerMenuText]}>Cikis Yap</Text>
               </View>
             </TouchableOpacity>
 
@@ -582,7 +582,6 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '94%',
-    backgroundColor: '#1f1f21',
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     overflow: 'hidden',
@@ -596,7 +595,6 @@ const styles = StyleSheet.create({
   },
   topTitle: {
     ...typography.heading,
-    color: '#f4f5f7',
     fontSize: 18,
   },
   closeButton: {
@@ -606,7 +604,6 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -615,7 +612,6 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   profileCard: {
-    backgroundColor: '#2b2b2e',
     borderRadius: 14,
     padding: 16,
     flexDirection: 'row',
@@ -628,7 +624,6 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#8f6bff',
     marginRight: 14,
   },
   avatarBadgeText: {
@@ -649,7 +644,6 @@ const styles = StyleSheet.create({
   },
   profileName: {
     ...typography.title,
-    color: '#f4f5f7',
     fontSize: 20,
   },
   statusRow: {
@@ -666,18 +660,15 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...typography.caption,
-    color: '#b8b8bc',
     fontSize: 13,
   },
   groupLabel: {
     ...typography.label,
-    color: '#8f8f94',
     fontSize: 12,
     marginBottom: 8,
     marginLeft: 2,
   },
   groupCard: {
-    backgroundColor: '#2b2b2e',
     borderRadius: 14,
     overflow: 'hidden',
     marginBottom: 14,
@@ -699,51 +690,36 @@ const styles = StyleSheet.create({
     ...typography.bodyStrong,
     fontSize: 17,
   },
-  detailCard: {
-    backgroundColor: '#2b2b2e',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-  },
   inlineDetailCard: {
-    backgroundColor: '#252528',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.06)',
     padding: 14,
   },
   detailTitle: {
     ...typography.title,
-    color: '#f4f5f7',
     fontSize: 18,
     marginBottom: 10,
   },
   infoLabel: {
     ...typography.label,
-    color: '#8f8f94',
     fontSize: 12,
     marginTop: 8,
   },
   infoValue: {
     ...typography.bodyStrong,
-    color: '#f4f5f7',
     fontSize: 15,
     marginTop: 4,
   },
   label: {
     ...typography.label,
-    color: '#b8b8bc',
     fontSize: 12,
     marginBottom: 8,
     marginTop: 8,
   },
   input: {
-    backgroundColor: '#232326',
     borderWidth: 1,
-    borderColor: '#3a3a3f',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#f4f5f7',
     fontSize: 15,
   },
   textArea: {
@@ -751,9 +727,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   secondaryAction: {
-    backgroundColor: '#232326',
     borderWidth: 1,
-    borderColor: '#3a3a3f',
     borderRadius: 12,
     paddingVertical: 13,
     paddingHorizontal: 14,
@@ -761,7 +735,6 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     ...typography.heading,
-    color: '#2aa7ff',
     fontSize: 14,
   },
   actionSpacing: {
@@ -769,7 +742,6 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: 16,
-    backgroundColor: '#2a6cff',
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
@@ -804,13 +776,11 @@ const styles = StyleSheet.create({
   },
   inlineInfoText: {
     ...typography.caption,
-    color: '#ff9aa0',
     fontSize: 13,
     flex: 1,
   },
   dangerButton: {
     marginTop: 16,
-    backgroundColor: '#ff5d67',
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
@@ -819,7 +789,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutRow: {
-    backgroundColor: '#2b2b2e',
     borderRadius: 14,
     paddingHorizontal: 14,
     minHeight: 54,
@@ -830,7 +799,6 @@ const styles = StyleSheet.create({
     color: '#ff5d67',
   },
   versionCard: {
-    backgroundColor: '#2b2b2e',
     borderRadius: 14,
     minHeight: 46,
     paddingHorizontal: 14,
@@ -840,12 +808,10 @@ const styles = StyleSheet.create({
   },
   versionLabel: {
     ...typography.label,
-    color: '#8f8f94',
     fontSize: 12,
   },
   versionValue: {
     ...typography.caption,
-    color: '#8f8f94',
     fontSize: 12,
   },
   buttonDisabled: {

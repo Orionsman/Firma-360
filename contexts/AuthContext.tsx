@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useState,
 } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -17,6 +18,13 @@ interface Company {
   email?: string;
 }
 
+interface CompanyMembership {
+  company_id: string;
+  role: 'owner' | 'admin' | 'user';
+  created_at?: string;
+  companies: Company | null;
+}
+
 interface SignUpResult {
   requiresEmailConfirmation: boolean;
 }
@@ -25,6 +33,9 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   company: Company | null;
+  companies: CompanyMembership[];
+  activeCompanyId: string | null;
+  activeRole: CompanyMembership['role'] | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
@@ -33,6 +44,8 @@ interface AuthContextType {
     companyName: string
   ) => Promise<SignUpResult>;
   createCompanyProfile: (companyName: string) => Promise<void>;
+  createAdditionalCompany: (companyName: string) => Promise<void>;
+  switchCompany: (companyId: string) => Promise<void>;
   requestAccountDeletion: (reason?: string) => Promise<void>;
   deleteAccount: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -40,6 +53,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const ACTIVE_COMPANY_STORAGE_KEY = 'cepte_cari_active_company_id';
 
 const getReadableAuthError = (error: unknown) => {
   const message =
@@ -94,34 +108,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
+  const [companies, setCompanies] = useState<CompanyMembership[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
+  const [activeRole, setActiveRole] = useState<CompanyMembership['role'] | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchCompany = async (userId: string) => {
-    const { data } = await supabase
+  const syncUserContext = async (nextUser: User | null) => {
+    setUser(nextUser);
+
+    if (!nextUser) {
+      setCompanies([]);
+      setCompany(null);
+      setActiveCompanyId(null);
+      setActiveRole(null);
+      await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
+      return;
+    }
+
+    await supabase.rpc('upsert_current_user_profile', {
+      profile_full_name: nextUser.user_metadata?.full_name ?? null,
+    });
+    await supabase.rpc('accept_pending_team_invitations');
+
+    const { data, error } = await supabase
       .from('user_companies')
       .select(
-        'company_id, companies(id, name, tax_number, address, phone, email)'
+        'company_id, role, created_at, companies(id, name, tax_number, address, phone, email)'
       )
-      .eq('user_id', userId)
-      .maybeSingle();
+      .eq('user_id', nextUser.id)
+      .order('created_at', { ascending: true });
 
-    if (data?.companies) {
-      setCompany(data.companies as unknown as Company);
-    } else {
+    if (error) {
+      setCompanies([]);
       setCompany(null);
+      setActiveCompanyId(null);
+      setActiveRole(null);
+      return;
+    }
+
+    const memberships = (((data as unknown) as CompanyMembership[] | null) ?? []).map((membership) => ({
+      ...membership,
+      companies: Array.isArray(membership.companies)
+        ? (membership.companies[0] as Company | undefined) ?? null
+        : membership.companies,
+    })).filter(
+      (membership) => membership.companies
+    );
+    const storedCompanyId = await AsyncStorage.getItem(ACTIVE_COMPANY_STORAGE_KEY);
+    const selectedMembership =
+      memberships.find((membership) => membership.company_id === storedCompanyId) ||
+      memberships[0] ||
+      null;
+
+    setCompanies(memberships);
+    setCompany((selectedMembership?.companies as Company | null) ?? null);
+    setActiveCompanyId(selectedMembership?.company_id ?? null);
+    setActiveRole(selectedMembership?.role ?? null);
+
+    if (selectedMembership?.company_id) {
+      await AsyncStorage.setItem(
+        ACTIVE_COMPANY_STORAGE_KEY,
+        selectedMembership.company_id
+      );
+    } else {
+      await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
     }
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: nextSession } }) => {
       setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-
-      if (nextSession?.user) {
-        fetchCompany(nextSession.user.id);
-      }
-
-      setLoading(false);
+      void syncUserContext(nextSession?.user ?? null).finally(() => {
+        setLoading(false);
+      });
     });
 
     const {
@@ -129,13 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       (async () => {
         setSession(nextSession);
-        setUser(nextSession?.user ?? null);
-
-        if (nextSession?.user) {
-          await fetchCompany(nextSession.user.id);
-        } else {
-          setCompany(null);
-        }
+        await syncUserContext(nextSession?.user ?? null);
       })();
     });
 
@@ -176,10 +229,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setSession(authData.session);
-    setUser(authData.user);
 
     await createCompanyProfile(companyName, authData.user.id);
-    await fetchCompany(authData.user.id);
+    await syncUserContext(authData.user);
 
     return { requiresEmailConfirmation: false };
   };
@@ -225,7 +277,68 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(getReadableAuthError(rpcError));
     }
 
-    await fetchCompany(resolvedUserId);
+    if (resolvedUserId === user?.id) {
+      await syncUserContext(user);
+    }
+  };
+
+  const createAdditionalCompany = async (companyName: string) => {
+    const trimmedName = companyName.trim();
+    if (!trimmedName) {
+      throw new Error('Firma adı boş olamaz.');
+    }
+
+    const { data, error } = await supabase.rpc(
+      'create_additional_company_for_current_user',
+      {
+        company_name: trimmedName,
+      }
+    );
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+
+    await syncUserContext(user);
+    if (data) {
+      await switchCompany(data as string);
+    }
+  };
+
+  const switchCompany = async (companyId: string) => {
+    let nextMembership =
+      companies.find((membership) => membership.company_id === companyId) || null;
+
+    if (!nextMembership && user) {
+      const { data } = await supabase
+        .from('user_companies')
+        .select(
+          'company_id, role, created_at, companies(id, name, tax_number, address, phone, email)'
+        )
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      const memberships = (((data as unknown) as CompanyMembership[] | null) ?? []).map((membership) => ({
+        ...membership,
+        companies: Array.isArray(membership.companies)
+          ? (membership.companies[0] as Company | undefined) ?? null
+          : membership.companies,
+      })).filter(
+        (membership) => membership.companies
+      );
+      setCompanies(memberships);
+      nextMembership =
+        memberships.find((membership) => membership.company_id === companyId) || null;
+    }
+
+    if (!nextMembership?.companies) {
+      throw new Error('Firma bulunamadı.');
+    }
+
+    setActiveCompanyId(companyId);
+    setCompany(nextMembership.companies);
+    setActiveRole(nextMembership.role);
+    await AsyncStorage.setItem(ACTIVE_COMPANY_STORAGE_KEY, companyId);
   };
 
   const signOut = async () => {
@@ -255,12 +368,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       throw new Error(getReadableAuthError(error));
     }
+
+    await supabase.auth.signOut();
+    setSession(null);
+    setUser(null);
+    setCompany(null);
+    setCompanies([]);
+    setActiveCompanyId(null);
+    setActiveRole(null);
+    await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
   };
 
   const refreshCompany = async () => {
-    const resolvedUserId = getUserId(undefined, user);
-    if (resolvedUserId) {
-      await fetchCompany(resolvedUserId);
+    if (user) {
+      await syncUserContext(user);
     }
   };
 
@@ -270,10 +391,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user,
         company,
+        companies,
+        activeCompanyId,
+        activeRole,
         loading,
         signIn,
         signUp,
         createCompanyProfile,
+        createAdditionalCompany,
+        switchCompany,
         requestAccountDeletion,
         deleteAccount,
         signOut,

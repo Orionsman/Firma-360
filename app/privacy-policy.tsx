@@ -6,22 +6,27 @@ const sections = [
   {
     title: 'Toplanan Veriler',
     body:
-      'Hesap bilgileri, firma profili, müşteriler, tedarikçiler, ürünler, satışlar, ödemeler ve stok hareketleri gibi uygulamaya girdiğiniz iş verileri saklanır.',
+      'Hesap bilgileri, firma profili, musteriler, tedarikciler, urunler, satislar, odemeler ve stok hareketleri gibi uygulamaya girdiginiz is verileri saklanir.',
   },
   {
     title: 'Verilerin Kullanimi',
     body:
-      'Bu veriler hesabınızı yönetmek, firma kayıtlarını senkronize etmek, güvenliği sağlamak ve destek sunmak için kullanılır.',
+      'Bu veriler hesabinizi yonetmek, firma kayitlarini senkronize etmek, guvenligi saglamak ve destek sunmak icin kullanilir.',
   },
   {
     title: 'Veri Saklama',
     body:
-      'Hesabınız aktif olduğu sürece veriler saklanır. Hesap silme talebi oluşturulduğunda, yasal veya finansal saklama zorunluluğu bulunmayan veriler silinir veya anonimleştirilir.',
+      'Hesabiniz aktif oldugu surece veriler saklanir. Hesap silme islemi baslatildiginda, yasal veya finansal saklama zorunlulugu bulunmayan veriler silinir veya anonimlestirilir.',
   },
   {
     title: 'Veri Paylasimi',
     body:
-      'Veriler satılmaz. Yalnızca uygulamayı çalıştırmak için gerekli altyapı ve servis sağlayıcılarla paylaşılır.',
+      'Veriler satilmaz. Yalnizca uygulamayi calistirmak icin gerekli altyapi ve servis saglayicilarla paylasilir.',
+  },
+  {
+    title: 'Kullanici Haklari',
+    body:
+      'Kullanicilar firma bilgilerini uygulama icinde guncelleyebilir ve hesaplarini uygulama icinden silebilir.',
   },
 ];
 
@@ -29,9 +34,9 @@ export default function PrivacyPolicyScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <BrandHeroHeader
-        kicker="YASAL BİLGİLENDİRME"
-        title="Gizlilik Politikası"
-        subtitle="Son güncelleme: 27 Mart 2026"
+        kicker="YASAL BILGILENDIRME"
+        title="Gizlilik Politikasi"
+        subtitle="Son guncelleme: 1 Nisan 2026"
       />
 
       {sections.map((section) => (
@@ -42,10 +47,10 @@ export default function PrivacyPolicyScreen() {
       ))}
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Yayın Notu</Text>
+        <Text style={styles.noteTitle}>Store Hazirligi</Text>
         <Text style={styles.noteText}>
-          Store gönderimi öncesinde bu içeriğin genel erişime açık bir HTTPS sayfasında
-          yayınlanması gerekir. Kaynak metin `docs/privacy-policy.md` dosyasında bulunur.
+          Bu sayfa, Expo web ciktisi olarak da yayinlanip App Store ve Google Play gizlilik politikasi
+          baglantisi olarak kullanilabilir.
         </Text>
       </View>
     </ScrollView>
@@ -61,20 +66,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 56,
     paddingBottom: 32,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    ...typography.title,
-    fontSize: 28,
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  subtitle: {
-    ...typography.caption,
-    fontSize: 14,
-    color: '#64748b',
   },
   card: {
     backgroundColor: '#ffffff',

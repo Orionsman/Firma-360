@@ -3,23 +3,24 @@ import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { typography } from '@/lib/typography';
 
 const steps = [
-  'Kullanıcı panelindeki Hesap bölümünden silme talebi başlatılır.',
-  'Talep onaylandığında sistemde bir silme kaydı oluşturulur.',
-  'Talep backend tarafında işlenir; uygun veriler silinir veya anonimleştirilir.',
-  'Yasal olarak saklanması gereken kayıtlar varsa bunlar ayrıca ele alınabilir.',
+  'Uygulamada oturum acin.',
+  'Ayarlar ekranina gidin.',
+  'Hesabi Kalici Olarak Sil bolumunu acin.',
+  'Isterseniz bir neden girin.',
+  'Silme islemini onaylayin.',
 ];
 
 export default function AccountDeletionScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <BrandHeroHeader
-        kicker="YASAL BİLGİLENDİRME"
+        kicker="YASAL BILGILENDIRME"
         title="Hesap Silme"
-        subtitle="Son güncelleme: 27 Mart 2026"
+        subtitle="Son guncelleme: 1 Nisan 2026"
       />
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Hesap Silme Nasıl Başlatılır?</Text>
+        <Text style={styles.cardTitle}>Hesap Silme Nasil Baslatilir?</Text>
         {steps.map((step) => (
           <Text key={step} style={styles.stepText}>
             - {step}
@@ -30,17 +31,16 @@ export default function AccountDeletionScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Silme Sonrasi</Text>
         <Text style={styles.cardBody}>
-          Silme işlemi tamamlandığında hesaba yeniden erişmek için yeni bir hesap
-          oluşturmanız gerekebilir. Saklama zorunluluğu olan kayıtlar mevzuata göre
-          korunabilir.
+          Silme islemi tamamlandiginda kullanici oturumu kapatilir. Yasal olarak saklanmasi
+          gereken kayitlar disindaki hesap ve uygulama verileri silinir veya anonimlestirilir.
         </Text>
       </View>
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Play Store Notu</Text>
+        <Text style={styles.noteTitle}>Store Hazirligi</Text>
         <Text style={styles.noteText}>
-          Google Play için bu akışın genel erişime açık bir web sayfası olarak da
-          yayınlanması gerekir. Kaynak metin `docs/account-deletion.md` dosyasında bulunur.
+          Bu sayfa Expo web ciktisi olarak yayinlanip Google Play ve App Store hesap silme
+          politikalari icin acik URL olarak kullanilabilir.
         </Text>
       </View>
     </ScrollView>
@@ -56,20 +56,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 56,
     paddingBottom: 32,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    ...typography.title,
-    fontSize: 28,
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  subtitle: {
-    ...typography.caption,
-    fontSize: 14,
-    color: '#64748b',
   },
   card: {
     backgroundColor: '#ffffff',

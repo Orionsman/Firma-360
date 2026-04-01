@@ -1,13 +1,19 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider, useAppTheme } from '@/contexts/ThemeContext';
 import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
+import { initializeReminderNotifications } from '@/lib/collectionReminderNotifications';
 
 function AppNavigator() {
   const { mode } = useAppTheme();
   const { locale } = useLocale();
+
+  useEffect(() => {
+    void initializeReminderNotifications();
+  }, []);
 
   return (
     <>
@@ -17,6 +23,7 @@ function AppNavigator() {
         <Stack.Screen name="register" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="reports" />
+        <Stack.Screen name="business-tools" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="account-deletion" />
         <Stack.Screen name="+not-found" />

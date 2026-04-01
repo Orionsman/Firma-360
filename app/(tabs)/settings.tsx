@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {
   Building2,
+  BriefcaseBusiness,
   FileLock2,
   Info,
   KeyRound,
@@ -30,7 +31,7 @@ import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 export default function SettingsScreen() {
-  const { company, signOut, refreshCompany, requestAccountDeletion } = useAuth();
+  const { company, signOut, refreshCompany, deleteAccount } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
   const { locale, setLocale } = useLocale();
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
@@ -43,7 +44,7 @@ export default function SettingsScreen() {
   const [deletionReason, setDeletionReason] = useState('');
   const [savingCompany, setSavingCompany] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-  const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     setCompanyName(company?.name || '');
@@ -134,7 +135,7 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleRequestAccountDeletion = () => {
+  const handleDeleteAccount = () => {
     Alert.alert(
       t.settings.deletion.confirmTitle,
       t.settings.deletion.confirmText,
@@ -142,22 +143,24 @@ export default function SettingsScreen() {
         { text: t.common.cancel, style: 'cancel' },
         {
           text: t.settings.deletion.confirmAction,
+          style: 'destructive',
           onPress: async () => {
-            setRequestingDeletion(true);
+            setDeletingAccount(true);
             try {
-              await requestAccountDeletion(deletionReason);
+              await deleteAccount(deletionReason);
               setDeletionReason('');
               Alert.alert(
                 t.settings.deletion.receivedTitle,
                 t.settings.deletion.receivedText
               );
+              router.replace('/login');
             } catch (error: unknown) {
               Alert.alert(
                 t.common.error,
                 error instanceof Error ? error.message : t.settings.deletion.failed
               );
             } finally {
-              setRequestingDeletion(false);
+              setDeletingAccount(false);
             }
           },
         },
@@ -200,11 +203,27 @@ export default function SettingsScreen() {
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
           <Languages size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.language}</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Dil Ayarları</Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
           {t.settings.languageDescription}
         </Text>
+        <View
+          style={[
+            styles.languageSummary,
+            {
+              backgroundColor: theme.colors.surfaceMuted,
+              borderColor: theme.colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.languageSummaryLabel, { color: theme.colors.textMuted }]}>
+            Aktif dil
+          </Text>
+          <Text style={[styles.languageSummaryValue, { color: theme.colors.text }]}>
+            {locale === 'tr' ? 'Türkçe' : 'English'}
+          </Text>
+        </View>
 
         <View style={styles.optionRow}>
           <TouchableOpacity
@@ -356,6 +375,24 @@ export default function SettingsScreen() {
 
       <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         <View style={styles.cardHeader}>
+          <BriefcaseBusiness size={20} color={theme.colors.primary} />
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Pro Araçları</Text>
+        </View>
+        <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
+          Çoklu işletme, ekip erişimi, bulut yedekleme ve tahsilat hatırlatmalarını yönetin.
+        </Text>
+        <TouchableOpacity
+          style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+          onPress={() => router.push('/business-tools' as never)}
+        >
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+            İşletme Araçlarını Aç
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={styles.cardHeader}>
           <Info size={20} color={theme.colors.primary} />
           <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.about.title}</Text>
         </View>
@@ -415,13 +452,13 @@ export default function SettingsScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.dangerButton, { backgroundColor: theme.colors.danger }, requestingDeletion && styles.buttonDisabled]}
-          onPress={handleRequestAccountDeletion}
-          disabled={requestingDeletion}
+          style={[styles.dangerButton, { backgroundColor: theme.colors.danger }, deletingAccount && styles.buttonDisabled]}
+          onPress={handleDeleteAccount}
+          disabled={deletingAccount}
         >
           <Trash2 size={18} color="#ffffff" />
           <Text style={styles.dangerButtonText}>
-            {requestingDeletion
+            {deletingAccount
               ? t.settings.deletion.requesting
               : t.settings.deletion.action}
           </Text>
@@ -605,6 +642,22 @@ const styles = StyleSheet.create({
   optionRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  languageSummary: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  languageSummaryLabel: {
+    ...typography.caption,
+    fontSize: 12,
+  },
+  languageSummaryValue: {
+    ...typography.heading,
+    fontSize: 15,
+    marginTop: 4,
   },
   languageOption: {
     flex: 1,

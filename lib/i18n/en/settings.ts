@@ -34,21 +34,21 @@ export const enSettings = {
     deletionInfo: 'Open Account Deletion Details',
   },
   deletion: {
-    title: 'Account Deletion',
+    title: 'Delete Account Permanently',
     text:
-      'You can submit an account deletion request here. Once submitted, it will be processed in the background and may not be reversible.',
-    placeholder: 'You can write a short note about your request.',
+      'You can permanently delete your account and associated app data here. Data that must be retained for legal or security reasons may be kept as required.',
+    placeholder: 'You can write a short note about the deletion.',
     inlineInfo:
-      'When the process is complete, your account data will be deleted or anonymized.',
-    action: 'Submit Deletion Request',
-    requesting: 'Sending request...',
-    confirmTitle: 'Submit account deletion request?',
+      'When the process is complete, your session will be closed and your account data will be deleted or anonymized.',
+    action: 'Delete Account Permanently',
+    requesting: 'Deleting account...',
+    confirmTitle: 'Delete account permanently?',
     confirmText:
-      'This will record your deletion request. It will be processed in the background, and any data that does not need to be retained for legal reasons will be deleted or anonymized.',
-    confirmAction: 'Send Request',
-    receivedTitle: 'Request Received',
+      'This action cannot be undone. Your account and associated app data will be deleted or anonymized.',
+    confirmAction: 'Delete Account',
+    receivedTitle: 'Account Deleted',
     receivedText:
-      'Your deletion request has been recorded and will be completed in the background.',
+      'Your account has been deleted successfully and you have been signed out.',
     failed: 'Account could not be deleted.',
   },
   logout: 'Sign Out',

@@ -1,24 +1,23 @@
 # Account Deletion
 
-Last updated: March 27, 2026
+Last updated: April 1, 2026
 
-CepteCari provides an in-app account deletion request flow from the Settings screen.
+CepteCari provides an in-app account deletion flow from the Settings screen.
 
-## How Users Can Request Deletion
+## How Users Can Delete Their Account
 
 1. Open the app and sign in.
 2. Go to Settings.
-3. Open the "Hesap Silme" section.
+3. Open the "Delete Account Permanently" section.
 4. Optionally enter a reason.
-5. Confirm the deletion request.
+5. Confirm the deletion.
 
 ## What Happens Next
 
-- The request is recorded immediately.
-- The request is processed by backend/admin tooling.
-- Account and associated business data should then be deleted or anonymized during backend processing, except where retention is required for legal, tax, fraud-prevention, or security reasons.
+- The account deletion is processed from inside the app.
+- The active session is closed.
+- Account and associated app data are deleted or anonymized, except where retention is required for legal, tax, fraud-prevention, or security reasons.
 
-## Public Deletion URL
+## Store Usage
 
-Before Google Play submission, publish this content on a public web page and place that URL in the Play Console data deletion field.
-
+This page can be published as a public HTTPS page from the Expo web build and used in Google Play Console and App Store review materials.
