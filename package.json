@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "expo start",
     "build:web": "expo export --platform web",
+    "postbuild:web": "node scripts/copy-static-pages.js",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
   },

@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/privacy-policy",
+      "destination": "/privacy-policy.html"
+    },
+    {
+      "source": "/account-deletion",
+      "destination": "/account-deletion.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
