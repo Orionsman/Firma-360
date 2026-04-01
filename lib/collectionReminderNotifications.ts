@@ -40,12 +40,18 @@ export const requestReminderNotificationPermission = async () => {
   }
 
   const settings = await Notifications.getPermissionsAsync();
-  if (settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) {
+  if (
+    settings.granted ||
+    settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  ) {
     return true;
   }
 
   const response = await Notifications.requestPermissionsAsync();
-  return response.granted || response.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL;
+  return (
+    response.granted ||
+    response.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  );
 };
 
 const loadScheduledMap = async () => {
@@ -62,7 +68,7 @@ const buildReminderDate = (dueDate: string) => {
   const date = new Date(year, (month || 1) - 1, day || 1, 9, 0, 0, 0);
 
   if (date.getTime() <= Date.now()) {
-    date.setMinutes(date.getMinutes() + 2);
+    return null;
   }
 
   return date;
@@ -90,10 +96,14 @@ export const syncCollectionReminderNotifications = async (
 
   for (const reminder of pendingReminders) {
     const triggerDate = buildReminderDate(reminder.due_date);
+    if (!triggerDate) {
+      continue;
+    }
+
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: reminder.title,
-        body: `${reminder.customers?.name ? `${reminder.customers.name} • ` : ''}${reminder.note || 'Tahsilat tarihi geldi.'}${reminder.amount ? ` • ${Number(reminder.amount).toLocaleString('tr-TR')} TL` : ''}`,
+        body: `${reminder.customers?.name ? `${reminder.customers.name} - ` : ''}${reminder.note || 'Tahsilat tarihi geldi.'}${reminder.amount ? ` - ${Number(reminder.amount).toLocaleString('tr-TR')} TL` : ''}`,
         sound: false,
       },
       trigger: {

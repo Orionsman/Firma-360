@@ -1,4 +1,5 @@
 import { trAuth } from './auth';
+import { trBusinessTools } from './businessTools';
 import { trCommon } from './common';
 import { trCustomers } from './customers';
 import { trDashboard } from './dashboard';
@@ -18,4 +19,5 @@ export const tr = {
   products: trProducts,
   reports: trReports,
   auth: trAuth,
+  businessTools: trBusinessTools,
 } as const;

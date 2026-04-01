@@ -12,6 +12,8 @@ export const enAuth = {
     signingIn: 'Signing in...',
     noAccount: "Don't have an account?",
     register: 'Register',
+    emailPlaceholder: 'example@email.com',
+    passwordPlaceholder: 'At least 6 characters',
   },
   register: {
     heroSubtitle: 'Start managing receivables and payables in minutes.',
@@ -26,5 +28,7 @@ export const enAuth = {
     signingUp: 'Saving...',
     hasAccount: 'Already have an account?',
     signIn: 'Sign In',
+    companyPlaceholder: 'Kaya Trade',
+    emailPlaceholder: 'example@email.com',
   },
 } as const;

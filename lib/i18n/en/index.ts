@@ -1,5 +1,6 @@
 import type { TranslationSchema } from '../tr';
 import { enAuth } from './auth';
+import { enBusinessTools } from './businessTools';
 import { enCommon } from './common';
 import { enCustomers } from './customers';
 import { enDashboard } from './dashboard';
@@ -19,4 +20,5 @@ export const en: TranslationSchema = {
   products: enProducts,
   reports: enReports,
   auth: enAuth,
+  businessTools: enBusinessTools,
 };

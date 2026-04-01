@@ -161,7 +161,7 @@ export default function Register() {
                 color: theme.colors.text,
               },
             ]}
-            placeholder="Kaya Ticaret"
+            placeholder={t.auth.register.companyPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={companyName}
             onChangeText={setCompanyName}
@@ -178,7 +178,7 @@ export default function Register() {
                 color: theme.colors.text,
               },
             ]}
-            placeholder="ornek@email.com"
+            placeholder={t.auth.register.emailPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={email}
             onChangeText={setEmail}

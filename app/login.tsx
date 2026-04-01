@@ -131,7 +131,7 @@ export default function Login() {
                 color: theme.colors.text,
               },
             ]}
-            placeholder="ornek@email.com"
+            placeholder={t.auth.login.emailPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={email}
             onChangeText={setEmail}
@@ -150,7 +150,7 @@ export default function Login() {
                 color: theme.colors.text,
               },
             ]}
-            placeholder="********"
+            placeholder={t.auth.login.passwordPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={password}
             onChangeText={setPassword}

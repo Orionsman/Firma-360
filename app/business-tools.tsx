@@ -23,6 +23,7 @@ import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
 import { useAuth } from '@/contexts/AuthContext';
 import { syncCollectionReminderNotifications } from '@/lib/collectionReminderNotifications';
+import { t } from '@/lib/i18n';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 import { typography } from '@/lib/typography';
@@ -101,6 +102,13 @@ export default function BusinessToolsScreen() {
   const [savingReminder, setSavingReminder] = useState(false);
 
   const canManageCompany = activeRole === 'owner' || activeRole === 'admin';
+  const localeTag = t.locale() === 'tr' ? 'tr-TR' : 'en-US';
+  const businessTools = t.businessTools;
+  const roleLabels: Record<'owner' | 'admin' | 'user', string> = {
+    owner: 'Owner',
+    admin: businessTools.team.admin,
+    user: businessTools.team.user,
+  };
 
   const loadData = useCallback(async () => {
     if (!company) {
@@ -142,14 +150,20 @@ export default function BusinessToolsScreen() {
           .order('name', { ascending: true }),
       ]);
 
-    if (membersResult.error || invitationsResult.error || snapshotsResult.error || remindersResult.error || customersResult.error) {
+    if (
+      membersResult.error ||
+      invitationsResult.error ||
+      snapshotsResult.error ||
+      remindersResult.error ||
+      customersResult.error
+    ) {
       throw new Error(
         membersResult.error?.message ||
           invitationsResult.error?.message ||
           snapshotsResult.error?.message ||
           remindersResult.error?.message ||
           customersResult.error?.message ||
-          'Veriler yuklenemedi.'
+          businessTools.errors.loadFailed
       );
     }
 
@@ -168,7 +182,10 @@ export default function BusinessToolsScreen() {
     }
 
     const profiles = new Map(
-      ((profilesResult.data as ProfileRow[]) ?? []).map((profile) => [profile.user_id, profile])
+      ((profilesResult.data as ProfileRow[]) ?? []).map((profile) => [
+        profile.user_id,
+        profile,
+      ])
     );
 
     setMembers(
@@ -179,30 +196,38 @@ export default function BusinessToolsScreen() {
     );
     setInvitations((invitationsResult.data as InvitationRow[]) ?? []);
     setSnapshots((snapshotsResult.data as SnapshotRow[]) ?? []);
-    const normalizedReminders = ((((remindersResult.data as unknown) as ReminderRow[]) ?? []).map((reminder) => ({
-      ...reminder,
-      customers: Array.isArray(reminder.customers)
-        ? reminder.customers[0] ?? null
-        : reminder.customers,
-    })));
+    const normalizedReminders = (
+      (((remindersResult.data as unknown) as ReminderRow[]) ?? []).map((reminder) => ({
+        ...reminder,
+        customers: Array.isArray(reminder.customers)
+          ? reminder.customers[0] ?? null
+          : reminder.customers,
+      }))
+    );
 
     setReminders(normalizedReminders);
     setCustomers((customersResult.data as CustomerRow[]) ?? []);
     await syncCollectionReminderNotifications(normalizedReminders);
-  }, [company]);
+  }, [businessTools.errors.loadFailed, company]);
 
   useEffect(() => {
     void loadData().catch((error: unknown) => {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Veriler yuklenemedi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.errors.loadFailed
+      );
     });
-  }, [loadData]);
+  }, [businessTools.errors.loadFailed, loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await loadData();
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Veriler yenilenemedi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.errors.refreshFailed
+      );
     } finally {
       setRefreshing(false);
     }
@@ -210,7 +235,7 @@ export default function BusinessToolsScreen() {
 
   const handleCreateCompany = async () => {
     if (!newCompanyName.trim()) {
-      Alert.alert('Bilgi', 'Yeni firma adi gerekli.');
+      Alert.alert(t.common.info, businessTools.companies.createRequired);
       return;
     }
 
@@ -218,9 +243,12 @@ export default function BusinessToolsScreen() {
     try {
       await createAdditionalCompany(newCompanyName);
       setNewCompanyName('');
-      Alert.alert('Basarili', 'Yeni firma olusturuldu ve aktif hale getirildi.');
+      Alert.alert(t.common.success, businessTools.companies.createSuccess);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Firma olusturulamadi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.companies.createFailed
+      );
     } finally {
       setSavingCompany(false);
     }
@@ -232,7 +260,7 @@ export default function BusinessToolsScreen() {
     }
 
     if (!inviteEmail.trim()) {
-      Alert.alert('Bilgi', 'Davet e-postasi gerekli.');
+      Alert.alert(t.common.info, businessTools.team.inviteRequired);
       return;
     }
 
@@ -251,9 +279,12 @@ export default function BusinessToolsScreen() {
       setInviteEmail('');
       setInviteRole('user');
       await loadData();
-      Alert.alert('Basarili', 'Ekip daveti olusturuldu.');
+      Alert.alert(t.common.success, businessTools.team.inviteSuccess);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Davet olusturulamadi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.team.inviteFailed
+      );
     } finally {
       setSavingInvite(false);
     }
@@ -277,9 +308,12 @@ export default function BusinessToolsScreen() {
 
       setSnapshotName('');
       await loadData();
-      Alert.alert('Basarili', 'Bulut yedegi olusturuldu.');
+      Alert.alert(t.common.success, businessTools.snapshots.createSuccess);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Yedek olusturulamadi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.snapshots.createFailed
+      );
     } finally {
       setSavingSnapshot(false);
     }
@@ -287,12 +321,12 @@ export default function BusinessToolsScreen() {
 
   const handleRestoreSnapshot = (snapshotId: string) => {
     Alert.alert(
-      'Yedek geri yuklensin mi?',
-      'Bu islem mevcut firma verilerini secilen yedekle degistirir.',
+      businessTools.snapshots.restoreConfirmTitle,
+      businessTools.snapshots.restoreConfirmText,
       [
-        { text: 'Iptal', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Geri Yukle',
+          text: businessTools.snapshots.restoreAction,
           style: 'destructive',
           onPress: async () => {
             try {
@@ -303,11 +337,11 @@ export default function BusinessToolsScreen() {
                 throw error;
               }
               await loadData();
-              Alert.alert('Basarili', 'Yedek geri yuklendi.');
+              Alert.alert(t.common.success, businessTools.snapshots.restoreSuccess);
             } catch (error: unknown) {
               Alert.alert(
-                'Hata',
-                error instanceof Error ? error.message : 'Yedek geri yuklenemedi.'
+                t.common.error,
+                error instanceof Error ? error.message : businessTools.snapshots.restoreFailed
               );
             }
           },
@@ -322,7 +356,7 @@ export default function BusinessToolsScreen() {
     }
 
     if (!reminderForm.title.trim()) {
-      Alert.alert('Bilgi', 'Hatirlatma basligi gerekli.');
+      Alert.alert(t.common.info, businessTools.reminders.titleRequired);
       return;
     }
 
@@ -349,11 +383,11 @@ export default function BusinessToolsScreen() {
         customerId: '',
       });
       await loadData();
-      Alert.alert('Basarili', 'Tahsilat hatirlatmasi eklendi.');
+      Alert.alert(t.common.success, businessTools.reminders.addSuccess);
     } catch (error: unknown) {
       Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Hatirlatma kaydedilemedi.'
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.reminders.addFailed
       );
     } finally {
       setSavingReminder(false);
@@ -376,7 +410,10 @@ export default function BusinessToolsScreen() {
 
       await loadData();
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Hatirlatma guncellenemedi.');
+      Alert.alert(
+        t.common.error,
+        error instanceof Error ? error.message : businessTools.errors.reminderUpdateFailed
+      );
     }
   };
 
@@ -392,9 +429,9 @@ export default function BusinessToolsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <BrandHeroHeader
-          kicker="ISLETME ARACLARI"
-          title="Pro Ozellikler"
-          subtitle="Coklu firma, ekip erisimi, bulut yedekleme ve tahsilat takibini yonetin."
+          kicker={businessTools.kicker}
+          title={businessTools.title}
+          subtitle={businessTools.subtitle}
           rightAccessory={
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
               <ArrowLeft size={18} color="#fff" />
@@ -402,13 +439,20 @@ export default function BusinessToolsScreen() {
           }
         />
 
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          ]}
+        >
           <View style={styles.cardHeader}>
             <Building2 size={20} color={theme.colors.primary} />
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Coklu Isletme Yonetimi</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+              {businessTools.companies.title}
+            </Text>
           </View>
           <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
-            Aktif firma secimi yapabilir veya yeni bir firma olusturabilirsiniz.
+            {businessTools.companies.helper}
           </Text>
           <View style={styles.companyList}>
             {companies.map((membership) => {
@@ -419,48 +463,84 @@ export default function BusinessToolsScreen() {
                   style={[
                     styles.companyChip,
                     {
-                      backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                      backgroundColor: isActive
+                        ? theme.colors.primarySoft
+                        : theme.colors.surfaceMuted,
                       borderColor: isActive ? theme.colors.primary : theme.colors.border,
                     },
                   ]}
                   onPress={() => void switchCompany(membership.company_id)}
                 >
-                  <Text style={[styles.companyChipText, { color: isActive ? theme.colors.primary : theme.colors.text }]}>
-                    {membership.companies?.name} ({membership.role})
+                  <Text
+                    style={[
+                      styles.companyChipText,
+                      { color: isActive ? theme.colors.primary : theme.colors.text },
+                    ]}
+                  >
+                    {membership.companies?.name} ({roleLabels[membership.role]})
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-            placeholder="Yeni firma adi"
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+              },
+            ]}
+            placeholder={businessTools.companies.createPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={newCompanyName}
             onChangeText={setNewCompanyName}
           />
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingCompany && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: theme.colors.primary },
+              savingCompany && styles.buttonDisabled,
+            ]}
             onPress={handleCreateCompany}
             disabled={savingCompany}
           >
-            <Text style={styles.primaryButtonText}>{savingCompany ? 'Olusturuluyor...' : 'Yeni Firma Ekle'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {savingCompany
+                ? businessTools.companies.creating
+                : businessTools.companies.createAction}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          ]}
+        >
           <View style={styles.cardHeader}>
             <Users size={20} color={theme.colors.primary} />
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Personel ve Ekip Erisimi</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+              {businessTools.team.title}
+            </Text>
           </View>
           <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
-            Davet edilen kullanicilar ayni firmaya kendi hesaplariyla baglanabilir.
+            {businessTools.team.helper}
           </Text>
           {canManageCompany ? (
             <>
               <TextInput
-                style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-                placeholder="personel@firma.com"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: theme.colors.surfaceMuted,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.text,
+                  },
+                ]}
+                placeholder={businessTools.team.emailPlaceholder}
                 placeholderTextColor={theme.colors.textSoft}
                 value={inviteEmail}
                 onChangeText={setInviteEmail}
@@ -476,87 +556,142 @@ export default function BusinessToolsScreen() {
                       style={[
                         styles.companyChip,
                         {
-                          backgroundColor: active ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                          backgroundColor: active
+                            ? theme.colors.primarySoft
+                            : theme.colors.surfaceMuted,
                           borderColor: active ? theme.colors.primary : theme.colors.border,
                         },
                       ]}
                       onPress={() => setInviteRole(role)}
                     >
-                      <Text style={[styles.companyChipText, { color: active ? theme.colors.primary : theme.colors.text }]}>
-                        {role === 'admin' ? 'Yonetici' : 'Kullanici'}
+                      <Text
+                        style={[
+                          styles.companyChipText,
+                          { color: active ? theme.colors.primary : theme.colors.text },
+                        ]}
+                      >
+                        {roleLabels[role]}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
               <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingInvite && styles.buttonDisabled]}
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: theme.colors.primary },
+                  savingInvite && styles.buttonDisabled,
+                ]}
                 onPress={handleInvite}
                 disabled={savingInvite}
               >
                 <Mail size={16} color="#fff" />
-                <Text style={styles.primaryButtonText}>{savingInvite ? 'Gonderiliyor...' : 'Davet Gonder'}</Text>
+                <Text style={styles.primaryButtonText}>
+                  {savingInvite
+                    ? businessTools.team.inviting
+                    : businessTools.team.inviteAction}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
             <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
-              Ekip yonetimi icin owner veya admin rolune ihtiyaciniz var.
+              {businessTools.team.requiresManagerRole}
             </Text>
           )}
           <View style={styles.sectionList}>
             {members.map((member) => (
-              <View key={member.user_id} style={[styles.listRow, { borderColor: theme.colors.border }]}>
+              <View
+                key={member.user_id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
+              >
                 <View>
                   <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
-                    {member.profile?.full_name || member.profile?.email || member.user_id.slice(0, 8)}
+                    {member.profile?.full_name ||
+                      member.profile?.email ||
+                      member.user_id.slice(0, 8)}
                   </Text>
                   <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {member.role} • {new Date(member.created_at).toLocaleDateString('tr-TR')}
+                    {roleLabels[member.role]} -{' '}
+                    {new Date(member.created_at).toLocaleDateString(localeTag)}
                   </Text>
                 </View>
                 <ShieldCheck size={18} color={theme.colors.primary} />
               </View>
             ))}
             {invitations.map((invite) => (
-              <View key={invite.id} style={[styles.listRow, { borderColor: theme.colors.border }]}>
+              <View
+                key={invite.id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
+              >
                 <View>
-                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{invite.email}</Text>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}> 
+                    {invite.email}
+                  </Text>
                   <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {invite.role} • {invite.status}
+                    {roleLabels[invite.role]} - {invite.status}
                   </Text>
                 </View>
-                <Text style={[styles.pendingBadge, { color: theme.colors.primary }]}>{invite.status}</Text>
+                <Text style={[styles.pendingBadge, { color: theme.colors.primary }]}>
+                  {invite.status}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          ]}
+        >
           <View style={styles.cardHeader}>
             <DatabaseBackup size={20} color={theme.colors.primary} />
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Bulut Yedekleme ve Geri Yukleme</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}> 
+              {businessTools.snapshots.title}
+            </Text>
           </View>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-            placeholder="Yedek adi (opsiyonel)"
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+              },
+            ]}
+            placeholder={businessTools.snapshots.placeholder}
             placeholderTextColor={theme.colors.textSoft}
             value={snapshotName}
             onChangeText={setSnapshotName}
           />
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingSnapshot && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: theme.colors.primary },
+              savingSnapshot && styles.buttonDisabled,
+            ]}
             onPress={handleCreateSnapshot}
             disabled={!canManageCompany || savingSnapshot}
           >
-            <Text style={styles.primaryButtonText}>{savingSnapshot ? 'Hazirlaniyor...' : 'Bulut Yedegi Olustur'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {savingSnapshot
+                ? businessTools.snapshots.creating
+                : businessTools.snapshots.createAction}
+            </Text>
           </TouchableOpacity>
           <View style={styles.sectionList}>
             {snapshots.map((snapshot) => (
-              <View key={snapshot.id} style={[styles.listRow, { borderColor: theme.colors.border }]}>
+              <View
+                key={snapshot.id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
+              >
                 <View>
-                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{snapshot.snapshot_name}</Text>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
+                    {snapshot.snapshot_name}
+                  </Text>
                   <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {new Date(snapshot.created_at).toLocaleString('tr-TR')}
+                    {new Date(snapshot.created_at).toLocaleString(localeTag)}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => handleRestoreSnapshot(snapshot.id)}>
@@ -567,39 +702,68 @@ export default function BusinessToolsScreen() {
           </View>
         </View>
 
-        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+          ]}
+        >
           <View style={styles.cardHeader}>
             <Mail size={20} color={theme.colors.primary} />
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Tahsilat Hatirlatmalari</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+              {businessTools.reminders.title}
+            </Text>
           </View>
           <Text style={[styles.helperText, { color: theme.colors.textMuted }]}>
-            Bekleyen hatirlatma sayisi: {pendingReminderCount}
+            {businessTools.reminders.pendingCount}: {pendingReminderCount}
           </Text>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-            placeholder="Hatirlatma basligi"
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+              },
+            ]}
+            placeholder={businessTools.reminders.titlePlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={reminderForm.title}
             onChangeText={(title) => setReminderForm((current) => ({ ...current, title }))}
           />
           <TextInput
-            style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-            placeholder="Not"
+            style={[
+              styles.input,
+              styles.textArea,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+              },
+            ]}
+            placeholder={businessTools.reminders.notePlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={reminderForm.note}
             onChangeText={(note) => setReminderForm((current) => ({ ...current, note }))}
             multiline
           />
           <TextInput
-            style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
-            placeholder="Tutar"
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+                color: theme.colors.text,
+              },
+            ]}
+            placeholder={businessTools.reminders.amountPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
             value={reminderForm.amount}
             onChangeText={(amount) => setReminderForm((current) => ({ ...current, amount }))}
             keyboardType="decimal-pad"
           />
           <DateField
-            label="Vade tarihi"
+            label={businessTools.reminders.dueDate}
             value={reminderForm.dueDate}
             onChange={(dueDate) => setReminderForm((current) => ({ ...current, dueDate }))}
             textColor={theme.colors.text}
@@ -613,14 +777,23 @@ export default function BusinessToolsScreen() {
               style={[
                 styles.companyChip,
                 {
-                  backgroundColor: !reminderForm.customerId ? theme.colors.primarySoft : theme.colors.surfaceMuted,
-                  borderColor: !reminderForm.customerId ? theme.colors.primary : theme.colors.border,
+                  backgroundColor: !reminderForm.customerId
+                    ? theme.colors.primarySoft
+                    : theme.colors.surfaceMuted,
+                  borderColor: !reminderForm.customerId
+                    ? theme.colors.primary
+                    : theme.colors.border,
                 },
               ]}
               onPress={() => setReminderForm((current) => ({ ...current, customerId: '' }))}
             >
-              <Text style={[styles.companyChipText, { color: !reminderForm.customerId ? theme.colors.primary : theme.colors.text }]}>
-                Tum musteriler
+              <Text
+                style={[
+                  styles.companyChipText,
+                  { color: !reminderForm.customerId ? theme.colors.primary : theme.colors.text },
+                ]}
+              >
+                {businessTools.reminders.allCustomers}
               </Text>
             </TouchableOpacity>
             {customers.slice(0, 8).map((customer) => {
@@ -631,7 +804,9 @@ export default function BusinessToolsScreen() {
                   style={[
                     styles.companyChip,
                     {
-                      backgroundColor: active ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                      backgroundColor: active
+                        ? theme.colors.primarySoft
+                        : theme.colors.surfaceMuted,
                       borderColor: active ? theme.colors.primary : theme.colors.border,
                     },
                   ]}
@@ -639,7 +814,12 @@ export default function BusinessToolsScreen() {
                     setReminderForm((current) => ({ ...current, customerId: customer.id }))
                   }
                 >
-                  <Text style={[styles.companyChipText, { color: active ? theme.colors.primary : theme.colors.text }]}>
+                  <Text
+                    style={[
+                      styles.companyChipText,
+                      { color: active ? theme.colors.primary : theme.colors.text },
+                    ]}
+                  >
                     {customer.name}
                   </Text>
                 </TouchableOpacity>
@@ -647,31 +827,50 @@ export default function BusinessToolsScreen() {
             })}
           </View>
           <TouchableOpacity
-            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingReminder && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: theme.colors.primary },
+              savingReminder && styles.buttonDisabled,
+            ]}
             onPress={handleAddReminder}
             disabled={savingReminder}
           >
-            <Text style={styles.primaryButtonText}>{savingReminder ? 'Kaydediliyor...' : 'Hatirlatma Ekle'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {savingReminder
+                ? businessTools.reminders.adding
+                : businessTools.reminders.addAction}
+            </Text>
           </TouchableOpacity>
           <View style={styles.sectionList}>
             {reminders.map((reminder) => (
-              <View key={reminder.id} style={[styles.listRow, { borderColor: theme.colors.border }]}>
+              <View
+                key={reminder.id}
+                style={[styles.listRow, { borderColor: theme.colors.border }]}
+              >
                 <View style={styles.reminderText}>
-                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{reminder.title}</Text>
+                  <Text style={[styles.rowTitle, { color: theme.colors.text }]}>
+                    {reminder.title}
+                  </Text>
                   <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {(reminder.customers?.name ? `${reminder.customers.name} • ` : '') +
-                      new Date(reminder.due_date).toLocaleDateString('tr-TR')}
+                    {(reminder.customers?.name ? `${reminder.customers.name} - ` : '') +
+                      `${businessTools.reminders.dueLabel} ${new Date(reminder.due_date).toLocaleDateString(localeTag)}`}
                   </Text>
                   {reminder.note ? (
-                    <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>{reminder.note}</Text>
+                    <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
+                      {reminder.note}
+                    </Text>
                   ) : null}
                 </View>
                 <View style={styles.reminderActions}>
                   <TouchableOpacity onPress={() => void markReminder(reminder.id, 'completed')}>
-                    <Text style={[styles.pendingBadge, { color: theme.colors.success }]}>Tamamla</Text>
+                    <Text style={[styles.pendingBadge, { color: theme.colors.success }]}>
+                      {businessTools.reminders.complete}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => void markReminder(reminder.id, 'dismissed')}>
-                    <Text style={[styles.pendingBadge, { color: theme.colors.danger }]}>Kapat</Text>
+                    <Text style={[styles.pendingBadge, { color: theme.colors.danger }]}>
+                      {businessTools.reminders.dismiss}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
