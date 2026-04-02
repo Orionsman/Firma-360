@@ -103,14 +103,10 @@ export default function SettingsScreen() {
 
     setSavingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
         throw error;
       }
-
       setNewPassword('');
       Alert.alert(t.common.success, t.settings.password.updated);
     } catch (error: unknown) {
@@ -136,36 +132,32 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      t.settings.deletion.confirmTitle,
-      t.settings.deletion.confirmText,
-      [
-        { text: t.common.cancel, style: 'cancel' },
-        {
-          text: t.settings.deletion.confirmAction,
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingAccount(true);
-            try {
-              await deleteAccount(deletionReason);
-              setDeletionReason('');
-              Alert.alert(
-                t.settings.deletion.receivedTitle,
-                t.settings.deletion.receivedText
-              );
-              router.replace('/login');
-            } catch (error: unknown) {
-              Alert.alert(
-                t.common.error,
-                error instanceof Error ? error.message : t.settings.deletion.failed
-              );
-            } finally {
-              setDeletingAccount(false);
-            }
-          },
+    Alert.alert(t.settings.deletion.confirmTitle, t.settings.deletion.confirmText, [
+      { text: t.common.cancel, style: 'cancel' },
+      {
+        text: t.settings.deletion.confirmAction,
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingAccount(true);
+          try {
+            await deleteAccount(deletionReason);
+            setDeletionReason('');
+            Alert.alert(
+              t.settings.deletion.receivedTitle,
+              t.settings.deletion.receivedText
+            );
+            router.replace('/login');
+          } catch (error: unknown) {
+            Alert.alert(
+              t.common.error,
+              error instanceof Error ? error.message : t.settings.deletion.failed
+            );
+          } finally {
+            setDeletingAccount(false);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -200,10 +192,17 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </BrandHeroHeader>
 
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <Languages size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Dil Ayarları</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {t.settings.languageTitle}
+          </Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
           {t.settings.languageDescription}
@@ -218,10 +217,10 @@ export default function SettingsScreen() {
           ]}
         >
           <Text style={[styles.languageSummaryLabel, { color: theme.colors.textMuted }]}>
-            Aktif dil
+            {t.settings.activeLanguage}
           </Text>
           <Text style={[styles.languageSummaryValue, { color: theme.colors.text }]}>
-            {locale === 'tr' ? 'Türkçe' : 'English'}
+            {locale === 'tr' ? t.common.languages.turkish : t.common.languages.english}
           </Text>
         </View>
 
@@ -232,8 +231,7 @@ export default function SettingsScreen() {
               {
                 backgroundColor:
                   locale === 'tr' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
-                borderColor:
-                  locale === 'tr' ? theme.colors.primary : theme.colors.border,
+                borderColor: locale === 'tr' ? theme.colors.primary : theme.colors.border,
               },
             ]}
             onPress={() => setLocale('tr')}
@@ -254,8 +252,7 @@ export default function SettingsScreen() {
               {
                 backgroundColor:
                   locale === 'en' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
-                borderColor:
-                  locale === 'en' ? theme.colors.primary : theme.colors.border,
+                borderColor: locale === 'en' ? theme.colors.primary : theme.colors.border,
               },
             ]}
             onPress={() => setLocale('en')}
@@ -272,13 +269,23 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <Building2 size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.companyInfo}</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {t.settings.companyInfo}
+          </Text>
         </View>
         <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+          style={[
+            styles.secondaryButton,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
           onPress={() => setShowCompanyEditor((current) => !current)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
@@ -290,39 +297,85 @@ export default function SettingsScreen() {
 
         {showCompanyEditor ? (
           <View style={styles.editorSection}>
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.companyName}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+              {t.common.fields.companyName}
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
               value={companyName}
               onChangeText={setCompanyName}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.settings.fields.taxNumber}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+              {t.settings.fields.taxNumber}
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
               value={taxNumber}
               onChangeText={setTaxNumber}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.phone}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+              {t.common.fields.phone}
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
               value={phone}
               onChangeText={setPhone}
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.email}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+              {t.common.fields.email}
+            </Text>
             <TextInput
-              style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
             />
 
-            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.address}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+              {t.common.fields.address}
+            </Text>
             <TextInput
-              style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              style={[
+                styles.input,
+                styles.textArea,
+                {
+                  backgroundColor: theme.colors.surfaceMuted,
+                  borderColor: theme.colors.border,
+                  color: theme.colors.text,
+                },
+              ]}
               value={address}
               onChangeText={setAddress}
               multiline
@@ -330,7 +383,11 @@ export default function SettingsScreen() {
             />
 
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingCompany && styles.buttonDisabled]}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: theme.colors.primary },
+                savingCompany && styles.buttonDisabled,
+              ]}
               onPress={handleSaveCompany}
               disabled={savingCompany}
             >
@@ -343,15 +400,31 @@ export default function SettingsScreen() {
         ) : null}
       </View>
 
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <KeyRound size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.password.title}</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {t.settings.password.title}
+          </Text>
         </View>
 
-        <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.password}</Text>
+        <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+          {t.common.fields.password}
+        </Text>
         <TextInput
-          style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.colors.surfaceMuted,
+              borderColor: theme.colors.border,
+              color: theme.colors.text,
+            },
+          ]}
           value={newPassword}
           onChangeText={setNewPassword}
           secureTextEntry
@@ -360,48 +433,70 @@ export default function SettingsScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.primaryButton, { backgroundColor: theme.colors.primary }, savingPassword && styles.buttonDisabled]}
+          style={[
+            styles.primaryButton,
+            { backgroundColor: theme.colors.primary },
+            savingPassword && styles.buttonDisabled,
+          ]}
           onPress={handleChangePassword}
           disabled={savingPassword}
         >
           <KeyRound size={18} color="#ffffff" />
           <Text style={styles.primaryButtonText}>
-            {savingPassword
-              ? t.settings.password.updating
-              : t.settings.password.action}
+            {savingPassword ? t.settings.password.updating : t.settings.password.action}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <BriefcaseBusiness size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Pro Araçları</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {t.settings.proTools.title}
+          </Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          Çoklu işletme, ekip erişimi, bulut yedekleme ve tahsilat hatırlatmalarını yönetin.
+          {t.settings.proTools.text}
         </Text>
         <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+          style={[
+            styles.secondaryButton,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
           onPress={() => router.push('/business-tools' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            İşletme Araçlarını Aç
+            {t.settings.proTools.action}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <Info size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{t.settings.about.title}</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {t.settings.about.title}
+          </Text>
         </View>
         <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
           {t.settings.about.text}
         </Text>
 
         <TouchableOpacity
-          style={[styles.secondaryButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+          style={[
+            styles.secondaryButton,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
           onPress={() => router.push('/privacy-policy' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
@@ -410,16 +505,64 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.secondaryButton, styles.secondaryButtonSpacing, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+          style={[
+            styles.secondaryButton,
+            styles.secondaryButtonSpacing,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
           onPress={() => router.push('/account-deletion' as never)}
         >
           <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
             {t.settings.about.deletionInfo}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.secondaryButton,
+            styles.secondaryButtonSpacing,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
+          onPress={() => router.push('/terms-of-service' as never)}
+        >
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+            {t.settings.about.terms}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.secondaryButton,
+            styles.secondaryButtonSpacing,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
+          onPress={() => router.push('/kvkk-notice' as never)}
+        >
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+            {t.settings.about.kvkk}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.secondaryButton,
+            styles.secondaryButtonSpacing,
+            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+          ]}
+          onPress={() => router.push('/support' as never)}
+        >
+          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
+            {t.settings.about.support}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={[styles.dangerCard, { backgroundColor: theme.colors.dangerSoft, borderColor: theme.colors.danger }]}>
+      <View
+        style={[
+          styles.dangerCard,
+          { backgroundColor: theme.colors.dangerSoft, borderColor: theme.colors.danger },
+        ]}
+      >
         <View style={styles.cardHeader}>
           <Trash2 size={20} color={theme.colors.danger} />
           <Text style={[styles.dangerCardTitle, { color: theme.colors.danger }]}>
@@ -435,7 +578,15 @@ export default function SettingsScreen() {
           {t.settings.fields.deletionReason}
         </Text>
         <TextInput
-          style={[styles.input, styles.textArea, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text }]}
+          style={[
+            styles.input,
+            styles.textArea,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+              color: theme.colors.text,
+            },
+          ]}
           value={deletionReason}
           onChangeText={setDeletionReason}
           multiline
@@ -452,15 +603,17 @@ export default function SettingsScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.dangerButton, { backgroundColor: theme.colors.danger }, deletingAccount && styles.buttonDisabled]}
+          style={[
+            styles.dangerButton,
+            { backgroundColor: theme.colors.danger },
+            deletingAccount && styles.buttonDisabled,
+          ]}
           onPress={handleDeleteAccount}
           disabled={deletingAccount}
         >
           <Trash2 size={18} color="#ffffff" />
           <Text style={styles.dangerButtonText}>
-            {deletingAccount
-              ? t.settings.deletion.requesting
-              : t.settings.deletion.action}
+            {deletingAccount ? t.settings.deletion.requesting : t.settings.deletion.action}
           </Text>
         </TouchableOpacity>
       </View>
@@ -484,74 +637,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingTop: 0,
     paddingBottom: 40,
-  },
-  header: {
-    marginBottom: 20,
-    alignItems: 'stretch',
-    paddingTop: 56,
-    paddingBottom: 26,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 34,
-    borderBottomRightRadius: 34,
-    overflow: 'hidden',
-  },
-  headerOrbOne: {
-    position: 'absolute',
-    top: -34,
-    right: -18,
-    width: 168,
-    height: 168,
-    borderRadius: 84,
-    backgroundColor: 'rgba(255,255,255,0.11)',
-  },
-  headerOrbTwo: {
-    position: 'absolute',
-    bottom: -52,
-    left: -28,
-    width: 138,
-    height: 138,
-    borderRadius: 69,
-    backgroundColor: 'rgba(34,228,214,0.12)',
-  },
-  headerBrandCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    padding: 18,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  headerLogoShell: {
-    width: 84,
-    height: 84,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTextBlock: {
-    flex: 1,
-  },
-  headerKicker: {
-    ...typography.label,
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 10,
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
-  title: {
-    ...typography.hero,
-    fontSize: 30,
-    marginBottom: 6,
-    color: '#ffffff',
-  },
-  subtitle: {
-    ...typography.body,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.82)',
-    lineHeight: 21,
   },
   themeToggle: {
     marginTop: 16,

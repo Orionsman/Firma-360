@@ -9,6 +9,18 @@
       "destination": "/account-deletion.html"
     },
     {
+      "source": "/terms-of-service",
+      "destination": "/terms-of-service.html"
+    },
+    {
+      "source": "/kvkk-notice",
+      "destination": "/kvkk-notice.html"
+    },
+    {
+      "source": "/support",
+      "destination": "/support.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

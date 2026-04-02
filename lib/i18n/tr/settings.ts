@@ -5,7 +5,9 @@ export const trSettings = {
   switchToLight: 'Acik moda gec',
   switchToDark: 'Koyu moda gec',
   language: 'Dil',
+  languageTitle: 'Dil Ayarlari',
   languageDescription: 'Uygulama dilini secin.',
+  activeLanguage: 'Aktif dil',
   companyInfo: 'Firma Bilgileri',
   companyNotFound: 'Duzenlenecek firma bulunamadi.',
   companyNameRequired: 'Firma adi bos olamaz.',
@@ -27,11 +29,20 @@ export const trSettings = {
     updating: 'Guncelleniyor...',
   },
   about: {
-    title: 'Hakkimizda',
+    title: 'Yasal ve Destek',
     text:
-      'CepteCari ile borc ve alacak takibini kolayca yonetin. Esnaflar ve kucuk isletmeler icin gelistirilen bu yapi sayesinde tum kayitlariniz her an elinizin altinda olur.',
+      'Gizlilik, hesap silme, kullanim kosullari, KVKK aydinlatma metni ve destek kanallarina bu bolumden ulasabilirsiniz.',
     privacy: 'Gizlilik Politikasini Ac',
     deletionInfo: 'Hesap Silme Detaylarini Ac',
+    terms: 'Kullanim Kosullarini Ac',
+    kvkk: 'KVKK Aydinlatma Metnini Ac',
+    support: 'Destek Bilgilerini Ac',
+  },
+  proTools: {
+    title: 'Pro Araclari',
+    text:
+      'Coklu isletme, ekip erisimi, bulut yedekleme ve tahsilat hatirlatmalarini yonetin.',
+    action: 'Isletme Araclarini Ac',
   },
   deletion: {
     title: 'Hesabi Kalici Olarak Sil',

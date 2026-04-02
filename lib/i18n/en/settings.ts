@@ -5,7 +5,9 @@ export const enSettings = {
   switchToLight: 'Switch to light mode',
   switchToDark: 'Switch to dark mode',
   language: 'Language',
+  languageTitle: 'Language Settings',
   languageDescription: 'Choose the app language.',
+  activeLanguage: 'Active language',
   companyInfo: 'Company Information',
   companyNotFound: 'No company found to edit.',
   companyNameRequired: 'Company name cannot be empty.',
@@ -27,11 +29,20 @@ export const enSettings = {
     updating: 'Updating...',
   },
   about: {
-    title: 'About',
+    title: 'Legal and Support',
     text:
-      'CepteCari helps you manage receivables and payables with ease, so your business records are always within reach.',
+      'Use this section to access privacy, account deletion, terms of service, KVKK notice, and support information.',
     privacy: 'Open Privacy Policy',
     deletionInfo: 'Open Account Deletion Details',
+    terms: 'Open Terms of Service',
+    kvkk: 'Open KVKK Notice',
+    support: 'Open Support Information',
+  },
+  proTools: {
+    title: 'Pro Tools',
+    text:
+      'Manage multi-company access, team members, cloud backups, and collection reminders.',
+    action: 'Open Business Tools',
   },
   deletion: {
     title: 'Delete Account Permanently',

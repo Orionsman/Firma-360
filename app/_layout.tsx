@@ -26,6 +26,9 @@ function AppNavigator() {
         <Stack.Screen name="business-tools" />
         <Stack.Screen name="privacy-policy" />
         <Stack.Screen name="account-deletion" />
+        <Stack.Screen name="terms-of-service" />
+        <Stack.Screen name="kvkk-notice" />
+        <Stack.Screen name="support" />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
