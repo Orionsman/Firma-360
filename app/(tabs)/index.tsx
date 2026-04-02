@@ -707,13 +707,13 @@ const styles = StyleSheet.create({
   heroTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 12,
     marginBottom: 10,
   },
   brandCard: {
     position: 'relative',
     flex: 1,
-    maxWidth: '84%',
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 22,
     paddingHorizontal: 16,
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
   },
   brandLogoShell: {
@@ -748,6 +748,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   brandLogoAura: {
     position: 'absolute',
@@ -766,6 +767,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 58,
     justifyContent: 'center',
+    flexShrink: 1,
+    paddingRight: 2,
   },
   brandKicker: {
     ...typography.label,
@@ -774,12 +777,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 4,
+    flexShrink: 1,
   },
   brandTitle: {
     ...typography.hero,
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 17,
+    lineHeight: 21,
     marginBottom: 1,
+    flexShrink: 1,
+    includeFontPadding: false,
   },
   brandSubtitle: {
     ...typography.body,
@@ -787,6 +794,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     marginTop: 3,
+    flexShrink: 1,
   },
   profileDot: {
     width: 58,
@@ -798,6 +806,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     position: 'relative',
+    flexShrink: 0,
   },
   profileDotRing: {
     width: 44,

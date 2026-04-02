@@ -11,11 +11,8 @@ import {
 } from 'react-native';
 import {
   Building2,
-  BriefcaseBusiness,
   FileLock2,
-  Info,
   KeyRound,
-  Languages,
   LogOut,
   MoonStar,
   Save,
@@ -23,7 +20,6 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLocale } from '@/contexts/LocaleContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
@@ -33,7 +29,6 @@ import { typography } from '@/lib/typography';
 export default function SettingsScreen() {
   const { company, signOut, refreshCompany, deleteAccount } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
-  const { locale, setLocale } = useLocale();
   const [showCompanyEditor, setShowCompanyEditor] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
@@ -191,83 +186,6 @@ export default function SettingsScreen() {
           </Text>
         </TouchableOpacity>
       </BrandHeroHeader>
-
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <Languages size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-            {t.settings.languageTitle}
-          </Text>
-        </View>
-        <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          {t.settings.languageDescription}
-        </Text>
-        <View
-          style={[
-            styles.languageSummary,
-            {
-              backgroundColor: theme.colors.surfaceMuted,
-              borderColor: theme.colors.border,
-            },
-          ]}
-        >
-          <Text style={[styles.languageSummaryLabel, { color: theme.colors.textMuted }]}>
-            {t.settings.activeLanguage}
-          </Text>
-          <Text style={[styles.languageSummaryValue, { color: theme.colors.text }]}>
-            {locale === 'tr' ? t.common.languages.turkish : t.common.languages.english}
-          </Text>
-        </View>
-
-        <View style={styles.optionRow}>
-          <TouchableOpacity
-            style={[
-              styles.languageOption,
-              {
-                backgroundColor:
-                  locale === 'tr' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
-                borderColor: locale === 'tr' ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-            onPress={() => setLocale('tr')}
-          >
-            <Text
-              style={[
-                styles.languageOptionText,
-                { color: locale === 'tr' ? theme.colors.primaryStrong : theme.colors.text },
-              ]}
-            >
-              {t.common.languages.turkish}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.languageOption,
-              {
-                backgroundColor:
-                  locale === 'en' ? theme.colors.primarySoft : theme.colors.surfaceMuted,
-                borderColor: locale === 'en' ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-            onPress={() => setLocale('en')}
-          >
-            <Text
-              style={[
-                styles.languageOptionText,
-                { color: locale === 'en' ? theme.colors.primaryStrong : theme.colors.text },
-              ]}
-            >
-              {t.common.languages.english}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <View
         style={[
@@ -450,115 +368,6 @@ export default function SettingsScreen() {
 
       <View
         style={[
-          styles.card,
-          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <BriefcaseBusiness size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-            {t.settings.proTools.title}
-          </Text>
-        </View>
-        <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          {t.settings.proTools.text}
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/business-tools' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.proTools.action}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <Info size={20} color={theme.colors.primary} />
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
-            {t.settings.about.title}
-          </Text>
-        </View>
-        <Text style={[styles.aboutText, { color: theme.colors.textMuted }]}>
-          {t.settings.about.text}
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/privacy-policy' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.about.privacy}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            styles.secondaryButtonSpacing,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/account-deletion' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.about.deletionInfo}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            styles.secondaryButtonSpacing,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/terms-of-service' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.about.terms}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            styles.secondaryButtonSpacing,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/kvkk-notice' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.about.kvkk}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.secondaryButton,
-            styles.secondaryButtonSpacing,
-            { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
-          ]}
-          onPress={() => router.push('/support' as never)}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.colors.primary }]}>
-            {t.settings.about.support}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View
-        style={[
           styles.dangerCard,
           { backgroundColor: theme.colors.dangerSoft, borderColor: theme.colors.danger },
         ]}
@@ -720,48 +529,6 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     ...typography.heading,
     fontSize: 15,
-  },
-  secondaryButtonSpacing: {
-    marginTop: 10,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  languageSummary: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  languageSummaryLabel: {
-    ...typography.caption,
-    fontSize: 12,
-  },
-  languageSummaryValue: {
-    ...typography.heading,
-    fontSize: 15,
-    marginTop: 4,
-  },
-  languageOption: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 15,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageOptionText: {
-    ...typography.heading,
-    fontSize: 15,
-  },
-  aboutText: {
-    ...typography.body,
-    fontSize: 14,
-    lineHeight: 22,
-    marginBottom: 16,
   },
   dangerCard: {
     borderRadius: 20,

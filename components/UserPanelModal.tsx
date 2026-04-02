@@ -13,10 +13,13 @@ import {
   View,
 } from 'react-native';
 import {
+  BriefcaseBusiness,
+  Languages,
   Building2,
   ChevronDown,
   ChevronRight,
   FileLock2,
+  Info,
   KeyRound,
   LogOut,
   MoonStar,
@@ -28,11 +31,20 @@ import {
   X,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
-type PanelSection = 'accountSettings' | 'company' | 'security' | 'delete';
+type PanelSection =
+  | 'accountSettings'
+  | 'company'
+  | 'security'
+  | 'delete'
+  | 'language'
+  | 'proTools'
+  | 'legal';
 
 type UserPanelModalProps = {
   visible: boolean;
@@ -50,15 +62,10 @@ const companyItems: MenuItem[] = [
   { key: 'company', label: 'Isletme Bilgileri', icon: Building2 },
 ];
 
-const accountItems: MenuItem[] = [
-  { key: 'accountSettings', label: 'Hesap Ayarlari', icon: UserRound },
-  { key: 'security', label: 'Sifre Yonetimi', icon: ShieldCheck },
-  { key: 'delete', label: 'Hesabi Sil', icon: Trash2, tone: 'danger' },
-];
-
 export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   const { user, company, signOut, refreshCompany, deleteAccount } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
+  const { locale, setLocale } = useLocale();
   const [activeSection, setActiveSection] = useState<PanelSection | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
@@ -97,6 +104,14 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 
   const version = Constants.expoConfig?.version || '1.0.0';
   const isDark = mode === 'dark';
+  const accountItems: MenuItem[] = [
+    { key: 'accountSettings', label: 'Hesap Ayarlari', icon: UserRound },
+    { key: 'security', label: 'Sifre Yonetimi', icon: ShieldCheck },
+    { key: 'delete', label: 'Hesabi Sil', icon: Trash2, tone: 'danger' },
+    { key: 'language', label: t.settings.languageTitle, icon: Languages },
+    { key: 'proTools', label: t.settings.proTools.title, icon: BriefcaseBusiness },
+    { key: 'legal', label: t.settings.about.title, icon: Info },
+  ];
 
   const handleSaveCompany = async () => {
     if (!company) {
@@ -333,31 +348,6 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>
             {company?.name || 'Firma olusturulmamis'}
           </Text>
-
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => router.push('/privacy-policy' as never)}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              Gizlilik Politikasini Ac
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              styles.actionSpacing,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => router.push('/account-deletion' as never)}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              Hesap Silme Bilgilerini Ac
-            </Text>
-          </TouchableOpacity>
         </View>
       );
     }
@@ -400,6 +390,206 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
             <KeyRound size={16} color="#fff" />
             <Text style={styles.primaryButtonText}>
               {savingPassword ? 'Guncelleniyor...' : 'Sifreyi Guncelle'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (section === 'language') {
+      return (
+        <View
+          style={[
+            styles.inlineDetailCard,
+            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
+          ]}
+        >
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
+            {t.settings.languageTitle}
+          </Text>
+          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
+            {t.settings.languageDescription}
+          </Text>
+          <View
+            style={[
+              styles.languageSummary,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <Text style={[styles.languageSummaryLabel, { color: theme.colors.textMuted }]}>
+              {t.settings.activeLanguage}
+            </Text>
+            <Text style={[styles.languageSummaryValue, { color: theme.colors.text }]}>
+              {locale === 'tr' ? t.common.languages.turkish : t.common.languages.english}
+            </Text>
+          </View>
+          <View style={styles.optionRow}>
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                {
+                  backgroundColor:
+                    locale === 'tr' ? theme.colors.primarySoft : theme.colors.surface,
+                  borderColor: locale === 'tr' ? theme.colors.primary : theme.colors.border,
+                },
+              ]}
+              onPress={() => setLocale('tr')}
+            >
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  { color: locale === 'tr' ? theme.colors.primaryStrong : theme.colors.text },
+                ]}
+              >
+                {t.common.languages.turkish}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.languageOption,
+                {
+                  backgroundColor:
+                    locale === 'en' ? theme.colors.primarySoft : theme.colors.surface,
+                  borderColor: locale === 'en' ? theme.colors.primary : theme.colors.border,
+                },
+              ]}
+              onPress={() => setLocale('en')}
+            >
+              <Text
+                style={[
+                  styles.languageOptionText,
+                  { color: locale === 'en' ? theme.colors.primaryStrong : theme.colors.text },
+                ]}
+              >
+                {t.common.languages.english}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    if (section === 'proTools') {
+      return (
+        <View
+          style={[
+            styles.inlineDetailCard,
+            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
+          ]}
+        >
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
+            {t.settings.proTools.title}
+          </Text>
+          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
+            {t.settings.proTools.text}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/business-tools' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.proTools.action}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (section === 'legal') {
+      return (
+        <View
+          style={[
+            styles.inlineDetailCard,
+            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
+          ]}
+        >
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
+            {t.settings.about.title}
+          </Text>
+          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
+            {t.settings.about.text}
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/privacy-policy' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.about.privacy}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              styles.actionSpacing,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/account-deletion' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.about.deletionInfo}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              styles.actionSpacing,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/terms-of-service' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.about.terms}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              styles.actionSpacing,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/kvkk-notice' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.about.kvkk}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              styles.actionSpacing,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push('/support' as never);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {t.settings.about.support}
             </Text>
           </TouchableOpacity>
         </View>
@@ -699,6 +889,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 10,
   },
+  inlineBodyText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   infoLabel: {
     ...typography.label,
     fontSize: 12,
@@ -732,6 +927,10 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: 14,
     marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   secondaryActionText: {
     ...typography.heading,
@@ -739,6 +938,39 @@ const styles = StyleSheet.create({
   },
   actionSpacing: {
     marginTop: 10,
+  },
+  languageSummary: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  languageSummaryLabel: {
+    ...typography.label,
+    fontSize: 12,
+  },
+  languageSummaryValue: {
+    ...typography.bodyStrong,
+    fontSize: 15,
+    marginTop: 4,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
+  },
+  languageOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageOptionText: {
+    ...typography.heading,
+    fontSize: 14,
   },
   primaryButton: {
     marginTop: 16,

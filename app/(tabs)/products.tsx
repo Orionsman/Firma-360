@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { PackagePlus, X, Package, TriangleAlert as AlertTriangle, Trash2 } from 'lucide-react-native';
+import { Plus, X, Package, TriangleAlert as AlertTriangle, Trash2 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -253,7 +253,12 @@ export default function Products() {
             }}
             style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
           >
-            <PackagePlus size={24} color="#ffffff" />
+            <View style={styles.addProductIcon}>
+              <Package size={20} color="#ffffff" />
+              <View style={styles.addBadge}>
+                <Plus size={12} color={theme.colors.primary} />
+              </View>
+            </View>
           </TouchableOpacity>
         }
       />
@@ -471,9 +476,31 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#3b82f6',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  addProductIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addBadge: {
+    position: 'absolute',
+    right: -4,
+    top: -3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
   },

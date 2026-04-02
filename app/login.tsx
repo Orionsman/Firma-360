@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   },
   heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 16,
   },
   heroLogoShell: {
@@ -250,12 +250,15 @@ const styles = StyleSheet.create({
   heroTextBlock: {
     flex: 1,
     justifyContent: 'center',
+    paddingTop: 6,
   },
   title: {
-    ...typography.hero,
-    fontSize: 34,
-    lineHeight: 38,
+    ...typography.title,
+    fontSize: 33,
+    lineHeight: 40,
+    letterSpacing: -0.3,
     includeFontPadding: false,
+    flexShrink: 1,
   },
   subtitle: {
     ...typography.body,
