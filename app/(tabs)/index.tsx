@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Layers3, Package, Plus, Users } from 'lucide-react-native';
+import { BellRing, Layers3, Package, Plus, Star, Users } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
@@ -41,9 +41,23 @@ interface ActivityItem {
 }
 
 type RelationRecord = { name?: string } | { name?: string }[] | null | undefined;
+type ReminderRecord = {
+  id: string;
+  title: string;
+  due_date: string;
+  amount?: number | null;
+  customers?: { name?: string } | { name?: string }[] | null;
+};
 
 export default function Dashboard() {
-  const { company, createCompanyProfile, user } = useAuth();
+  const {
+    company,
+    createCompanyProfile,
+    user,
+    recentAcceptedCompanies,
+    dismissAcceptedCompaniesNotice,
+    switchCompany,
+  } = useAuth();
   const { theme, mode } = useAppTheme();
   const [stats, setStats] = useState<DashboardStats>({
     totalReceivables: 0,
@@ -57,9 +71,11 @@ export default function Dashboard() {
   const [showAllRecentActivity, setShowAllRecentActivity] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [upcomingReminders, setUpcomingReminders] = useState<ReminderRecord[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [creatingCompany, setCreatingCompany] = useState(false);
   const [userPanelVisible, setUserPanelVisible] = useState(false);
+  const localeTag = t.locale() === 'tr' ? 'tr-TR' : 'en-US';
 
   const fetchDashboard = useCallback(async () => {
     if (!company) {
@@ -94,6 +110,7 @@ export default function Dashboard() {
         paymentsActivityResult,
         customersResult,
         productsResult,
+        remindersResult,
       ] = await Promise.all([
         supabase.from('sales').select('total_amount').eq('company_id', company.id),
         supabase
@@ -114,6 +131,14 @@ export default function Dashboard() {
           .order('created_at', { ascending: false }),
         supabase.from('customers').select('id').eq('company_id', company.id),
         supabase.from('products').select('id').eq('company_id', company.id),
+        supabase
+          .from('collection_reminders')
+          .select('id, title, due_date, amount, customers(name)')
+          .eq('company_id', company.id)
+          .eq('status', 'pending')
+          .gte('due_date', new Date().toISOString().split('T')[0])
+          .order('due_date', { ascending: true })
+          .limit(3),
       ]);
 
       if (
@@ -122,7 +147,8 @@ export default function Dashboard() {
         salesActivityResult.error ||
         paymentsActivityResult.error ||
         customersResult.error ||
-        productsResult.error
+        productsResult.error ||
+        remindersResult.error
       ) {
         Alert.alert(
           t.common.error,
@@ -132,6 +158,7 @@ export default function Dashboard() {
             paymentsActivityResult.error?.message ||
             customersResult.error?.message ||
             productsResult.error?.message ||
+            remindersResult.error?.message ||
             t.dashboard.errors.loadFailed
         );
         return;
@@ -198,6 +225,7 @@ export default function Dashboard() {
         totalSales,
       });
       setRecentActivity(activities);
+      setUpcomingReminders((remindersResult.data as ReminderRecord[]) ?? []);
     } finally {
       setLoadingDashboard(false);
     }
@@ -329,6 +357,24 @@ export default function Dashboard() {
     };
   };
 
+  const proCards = useMemo(
+    () => [
+      {
+        key: 'multi-company',
+        title: t.dashboard.pro.multiCompany.title,
+        text: t.dashboard.pro.multiCompany.text,
+        action: t.dashboard.pro.multiCompany.action,
+      },
+      {
+        key: 'team-access',
+        title: t.dashboard.pro.teamAccess.title,
+        text: t.dashboard.pro.teamAccess.text,
+        action: t.dashboard.pro.teamAccess.action,
+      },
+    ],
+    []
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
@@ -400,6 +446,55 @@ export default function Dashboard() {
           </View>
         </LinearGradient>
 
+        {recentAcceptedCompanies.length > 0 ? (
+          <View
+            style={[
+              styles.inviteNoticeCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <Text style={[styles.inviteNoticeTitle, { color: theme.colors.text }]}>
+              Yeni firma daveti kabul edildi
+            </Text>
+            <Text style={[styles.inviteNoticeText, { color: theme.colors.textMuted }]}>
+              Davet edilen firmaya hemen gecebilir veya mevcut firmanla devam edip daha sonra
+              degistirebilirsin.
+            </Text>
+            <View style={styles.inviteNoticeActions}>
+              {recentAcceptedCompanies.map((membership) => (
+                <TouchableOpacity
+                  key={membership.company_id}
+                  style={[
+                    styles.inviteSwitchButton,
+                    {
+                      backgroundColor: theme.colors.primarySoft,
+                      borderColor: theme.colors.primary,
+                    },
+                  ]}
+                  onPress={() => void switchCompany(membership.company_id)}
+                >
+                  <Text
+                    style={[styles.inviteSwitchButtonText, { color: theme.colors.primaryStrong }]}
+                  >
+                    {membership.companies?.name} firmasina gec
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={[
+                styles.inviteDismissButton,
+                { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border },
+              ]}
+              onPress={() => dismissAcceptedCompaniesNotice()}
+            >
+              <Text style={[styles.inviteDismissButtonText, { color: theme.colors.text }]}>
+                Daha sonra
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {!company ? (
           <View
             style={[
@@ -465,6 +560,107 @@ export default function Dashboard() {
             </TouchableOpacity>
           </View>
         ) : null}
+
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              {t.dashboard.pro.title}
+            </Text>
+          </View>
+          <Text style={[styles.proSectionSubtitle, { color: theme.colors.textMuted }]}>
+            {t.dashboard.pro.subtitle}
+          </Text>
+
+          <View style={styles.proGrid}>
+            {proCards.map((card) => (
+              <TouchableOpacity
+                key={card.key}
+                style={[
+                  styles.proFeatureTile,
+                  {
+                    backgroundColor: theme.colors.surfaceMuted,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+                onPress={() => router.push('/business-tools' as never)}
+              >
+                <View style={styles.proTileBadge}>
+                  <Star size={11} color="#8A4B00" fill="#F6B94C" />
+                </View>
+                <Text style={[styles.proTileTitle, { color: theme.colors.text }]}>{card.title}</Text>
+                <Text style={[styles.proTileText, { color: theme.colors.textMuted }]}>{card.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View
+            style={[
+              styles.proReminderSection,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+              },
+            ]}
+          >
+            <View style={styles.proReminderHeader}>
+              <View style={styles.proReminderTitleWrap}>
+                <Text style={[styles.proReminderTitle, { color: theme.colors.text }]}>
+                  {t.dashboard.pro.reminders.title}
+                </Text>
+                <Text style={[styles.proReminderText, { color: theme.colors.textMuted }]}>
+                  {t.dashboard.pro.reminders.text}
+                </Text>
+              </View>
+              <View style={styles.proReminderRight}>
+                <View style={styles.proBadge}>
+                  <Star size={12} color="#8A4B00" fill="#F6B94C" />
+                  <Text style={styles.proBadgeText}>{t.dashboard.pro.badge}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.reminderAddButton, { backgroundColor: theme.colors.primarySoft }]}
+                  onPress={() => router.push('/business-tools' as never)}
+                >
+                  <Plus size={16} color={theme.colors.primaryStrong} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {upcomingReminders.length === 0 ? (
+              <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
+                {t.dashboard.pro.reminders.empty}
+              </Text>
+            ) : (
+              upcomingReminders.map((reminder) => {
+                const customerName = Array.isArray(reminder.customers)
+                  ? reminder.customers[0]?.name
+                  : reminder.customers?.name;
+
+                return (
+                  <View
+                    key={reminder.id}
+                    style={[styles.reminderRow, { borderTopColor: theme.colors.border }]}
+                  >
+                    <View style={[styles.reminderIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+                      <BellRing size={16} color={theme.colors.primary} />
+                    </View>
+                    <View style={styles.reminderTextWrap}>
+                      <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
+                        {reminder.title}
+                      </Text>
+                      <Text style={[styles.reminderSubtitle, { color: theme.colors.textMuted }]}>
+                        {customerName || t.dashboard.activity.collection} - {t.dashboard.pro.reminders.duePrefix}:{' '}
+                        {new Date(reminder.due_date).toLocaleDateString(localeTag)}
+                      </Text>
+                    </View>
+                    <Text style={[styles.reminderAmount, { color: theme.colors.primaryStrong }]}>
+                      {formatTRY(Number(reminder.amount || 0))}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </View>
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>
@@ -669,6 +865,175 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
   content: { paddingBottom: 28 },
+  inviteNoticeCard: {
+    borderWidth: 1,
+    borderRadius: 24,
+    padding: 18,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 2,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  inviteNoticeTitle: {
+    ...typography.title,
+    fontSize: 19,
+  },
+  inviteNoticeText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+  },
+  inviteNoticeActions: {
+    gap: 10,
+    marginTop: 16,
+  },
+  inviteSwitchButton: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  inviteSwitchButtonText: {
+    ...typography.heading,
+    fontSize: 14,
+  },
+  inviteDismissButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteDismissButtonText: {
+    ...typography.heading,
+    fontSize: 14,
+  },
+  proSectionSubtitle: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 16,
+  },
+  proGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  proFeatureTile: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+    minHeight: 138,
+    justifyContent: 'space-between',
+  },
+  proTileBadge: {
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFE7B8',
+    marginBottom: 14,
+  },
+  proTileTitle: {
+    ...typography.title,
+    fontSize: 16,
+  },
+  proTileText: {
+    ...typography.body,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 8,
+  },
+  proReminderSection: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 16,
+  },
+  proBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFE7B8',
+  },
+  proBadgeText: {
+    ...typography.label,
+    fontSize: 11,
+    color: '#8A4B00',
+  },
+  proReminderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  proReminderTitleWrap: {
+    flex: 1,
+  },
+  proReminderTitle: {
+    ...typography.title,
+    fontSize: 18,
+  },
+  proReminderText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  proReminderRight: {
+    alignItems: 'flex-end',
+    gap: 10,
+  },
+  reminderAddButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderRow: {
+    borderTopWidth: 1,
+    paddingTop: 14,
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reminderIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reminderTextWrap: {
+    flex: 1,
+  },
+  reminderTitle: {
+    ...typography.heading,
+    fontSize: 14,
+  },
+  reminderSubtitle: {
+    ...typography.body,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 3,
+  },
+  reminderAmount: {
+    ...typography.heading,
+    fontSize: 13,
+  },
   hero: {
     paddingTop: 46,
     paddingHorizontal: 20,

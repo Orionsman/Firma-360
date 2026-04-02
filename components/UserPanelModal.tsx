@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import {
-  BriefcaseBusiness,
   Languages,
   Building2,
   ChevronDown,
@@ -43,7 +42,6 @@ type PanelSection =
   | 'security'
   | 'delete'
   | 'language'
-  | 'proTools'
   | 'legal';
 
 type UserPanelModalProps = {
@@ -63,7 +61,16 @@ const companyItems: MenuItem[] = [
 ];
 
 export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
-  const { user, company, signOut, refreshCompany, deleteAccount } = useAuth();
+  const {
+    user,
+    company,
+    companies,
+    activeCompanyId,
+    signOut,
+    refreshCompany,
+    deleteAccount,
+    switchCompany,
+  } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
   const { locale, setLocale } = useLocale();
   const [activeSection, setActiveSection] = useState<PanelSection | null>(null);
@@ -104,12 +111,16 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 
   const version = Constants.expoConfig?.version || '1.0.0';
   const isDark = mode === 'dark';
+  const roleLabels: Record<'owner' | 'admin' | 'user', string> = {
+    owner: 'Owner',
+    admin: 'Admin',
+    user: 'Kullanici',
+  };
   const accountItems: MenuItem[] = [
     { key: 'accountSettings', label: 'Hesap Ayarlari', icon: UserRound },
     { key: 'security', label: 'Sifre Yonetimi', icon: ShieldCheck },
     { key: 'delete', label: 'Hesabi Sil', icon: Trash2, tone: 'danger' },
     { key: 'language', label: t.settings.languageTitle, icon: Languages },
-    { key: 'proTools', label: t.settings.proTools.title, icon: BriefcaseBusiness },
     { key: 'legal', label: t.settings.about.title, icon: Info },
   ];
 
@@ -472,38 +483,6 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       );
     }
 
-    if (section === 'proTools') {
-      return (
-        <View
-          style={[
-            styles.inlineDetailCard,
-            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
-          ]}
-        >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
-            {t.settings.proTools.title}
-          </Text>
-          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
-            {t.settings.proTools.text}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/business-tools' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.proTools.action}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
     if (section === 'legal') {
       return (
         <View
@@ -729,6 +708,50 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
               </TouchableOpacity>
             </View>
 
+            <View
+              style={[
+                styles.companySwitcherCard,
+                { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              ]}
+            >
+              <Text style={[styles.companySwitcherTitle, { color: theme.colors.text }]}>
+                Firma Gecisi
+              </Text>
+              <Text style={[styles.companySwitcherText, { color: theme.colors.textMuted }]}>
+                Aktif firmayi buradan degistirebilirsin.
+              </Text>
+              <View style={styles.companySwitcherList}>
+                {companies.map((membership) => {
+                  const isActive = membership.company_id === activeCompanyId;
+
+                  return (
+                    <TouchableOpacity
+                      key={membership.company_id}
+                      style={[
+                        styles.companySwitcherChip,
+                        {
+                          backgroundColor: isActive
+                            ? theme.colors.primarySoft
+                            : theme.colors.surfaceMuted,
+                          borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                        },
+                      ]}
+                      onPress={() => void switchCompany(membership.company_id)}
+                    >
+                      <Text
+                        style={[
+                          styles.companySwitcherChipText,
+                          { color: isActive ? theme.colors.primaryStrong : theme.colors.text },
+                        ]}
+                      >
+                        {membership.companies?.name} ({roleLabels[membership.role]})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             <Text style={[styles.groupLabel, { color: theme.colors.textSoft }]}>ISLETME</Text>
             <View style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}>
               {companyItems.map(renderMenuItem)}
@@ -807,6 +830,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 18,
+  },
+  companySwitcherCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  companySwitcherTitle: {
+    ...typography.title,
+    fontSize: 18,
+  },
+  companySwitcherText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 6,
+  },
+  companySwitcherList: {
+    gap: 10,
+    marginTop: 14,
+  },
+  companySwitcherChip: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  companySwitcherChipText: {
+    ...typography.heading,
+    fontSize: 14,
   },
   avatarBadge: {
     width: 58,

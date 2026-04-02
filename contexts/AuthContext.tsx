@@ -29,6 +29,11 @@ interface SignUpResult {
   requiresEmailConfirmation: boolean;
 }
 
+interface RecentAcceptedInvitation {
+  company_id: string;
+  accepted_at?: string | null;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -36,6 +41,7 @@ interface AuthContextType {
   companies: CompanyMembership[];
   activeCompanyId: string | null;
   activeRole: CompanyMembership['role'] | null;
+  recentAcceptedCompanies: CompanyMembership[];
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
@@ -50,6 +56,7 @@ interface AuthContextType {
   deleteAccount: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshCompany: () => Promise<void>;
+  dismissAcceptedCompaniesNotice: (companyId?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [companies, setCompanies] = useState<CompanyMembership[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<CompanyMembership['role'] | null>(null);
+  const [recentAcceptedCompanies, setRecentAcceptedCompanies] = useState<CompanyMembership[]>([]);
   const [loading, setLoading] = useState(true);
 
   const syncUserContext = async (nextUser: User | null) => {
@@ -121,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCompany(null);
       setActiveCompanyId(null);
       setActiveRole(null);
+      setRecentAcceptedCompanies([]);
       await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
       return;
     }
@@ -128,7 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.rpc('upsert_current_user_profile', {
       profile_full_name: nextUser.user_metadata?.full_name ?? null,
     });
-    await supabase.rpc('accept_pending_team_invitations');
+    const { data: acceptedCountData } = await supabase.rpc('accept_pending_team_invitations');
+    const acceptedCount =
+      typeof acceptedCountData === 'number'
+        ? acceptedCountData
+        : Number(acceptedCountData ?? 0) || 0;
 
     const { data, error } = await supabase
       .from('user_companies')
@@ -164,6 +177,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCompany((selectedMembership?.companies as Company | null) ?? null);
     setActiveCompanyId(selectedMembership?.company_id ?? null);
     setActiveRole(selectedMembership?.role ?? null);
+
+    if (acceptedCount > 0) {
+      const acceptedAfter = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { data: acceptedInvitations } = await supabase
+        .from('team_invitations')
+        .select('company_id, accepted_at')
+        .eq('accepted_by', nextUser.id)
+        .eq('status', 'accepted')
+        .gte('accepted_at', acceptedAfter)
+        .order('accepted_at', { ascending: false });
+
+      const acceptedCompanyIds = new Set(
+        (((acceptedInvitations as unknown) as RecentAcceptedInvitation[] | null) ?? []).map(
+          (invitation) => invitation.company_id
+        )
+      );
+
+      if (acceptedCompanyIds.size > 0) {
+        setRecentAcceptedCompanies(
+          memberships.filter((membership) => acceptedCompanyIds.has(membership.company_id))
+        );
+      }
+    }
 
     if (selectedMembership?.company_id) {
       await AsyncStorage.setItem(
@@ -338,6 +374,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveCompanyId(companyId);
     setCompany(nextMembership.companies);
     setActiveRole(nextMembership.role);
+    setRecentAcceptedCompanies((current) =>
+      current.filter((membership) => membership.company_id !== companyId)
+    );
     await AsyncStorage.setItem(ACTIVE_COMPANY_STORAGE_KEY, companyId);
   };
 
@@ -376,6 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCompanies([]);
     setActiveCompanyId(null);
     setActiveRole(null);
+    setRecentAcceptedCompanies([]);
     await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
   };
 
@@ -383,6 +423,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       await syncUserContext(user);
     }
+  };
+
+  const dismissAcceptedCompaniesNotice = (companyId?: string) => {
+    if (!companyId) {
+      setRecentAcceptedCompanies([]);
+      return;
+    }
+
+    setRecentAcceptedCompanies((current) =>
+      current.filter((membership) => membership.company_id !== companyId)
+    );
   };
 
   return (
@@ -394,6 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companies,
         activeCompanyId,
         activeRole,
+        recentAcceptedCompanies,
         loading,
         signIn,
         signUp,
@@ -404,6 +456,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         deleteAccount,
         signOut,
         refreshCompany,
+        dismissAcceptedCompaniesNotice,
       }}
     >
       {children}

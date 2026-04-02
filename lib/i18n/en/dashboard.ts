@@ -52,4 +52,26 @@ export const enDashboard = {
     stockItems: 'Stock Item',
     totalSales: 'Total Sales',
   },
+  pro: {
+    title: 'Pro Features',
+    subtitle: 'Access advanced tools that speed up your workflow.',
+    badge: 'PRO',
+    multiCompany: {
+      title: 'Multi-Company Management',
+      text: 'Switch quickly between linked companies and manage them from one place.',
+      action: 'Manage Companies',
+    },
+    teamAccess: {
+      title: 'Staff and Team Access',
+      text: 'Manage invitations, team roles, and shared access from one panel.',
+      action: 'Manage Team',
+    },
+    reminders: {
+      title: 'Upcoming Collections',
+      text: 'Track collection reminders before they become overdue.',
+      empty: 'No upcoming collections.',
+      addAction: 'Add Collection Reminder',
+      duePrefix: 'Due',
+    },
+  },
 } as const;

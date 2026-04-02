@@ -52,4 +52,26 @@ export const trDashboard = {
     stockItems: 'Stok Kalemi',
     totalSales: 'Toplam Satis',
   },
+  pro: {
+    title: 'Pro Ozellikler',
+    subtitle: 'Gelismis is akisini hizlandiran araclara buradan ulasin.',
+    badge: 'PRO',
+    multiCompany: {
+      title: 'Coklu Isletme Yonetimi',
+      text: 'Bagli oldugun firmalar arasinda hizli gecis yap ve tum yapini yonet.',
+      action: 'Firmalari Yonet',
+    },
+    teamAccess: {
+      title: 'Personel ve Ekip Erisimi',
+      text: 'Davetleri, ekip rollerini ve ortak kullanim akisini tek yerden yonet.',
+      action: 'Ekibi Yonet',
+    },
+    reminders: {
+      title: 'Yaklasan Tahsilatlar',
+      text: 'Vadesi yaklasan tahsilatlarini kacirmadan takip et.',
+      empty: 'Yaklasan tahsilat bulunmuyor.',
+      addAction: 'Tahsilat Hatirlatma Ekle',
+      duePrefix: 'Vade',
+    },
+  },
 } as const;
