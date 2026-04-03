@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/ThemeContext';
 import { formatTRY } from '@/lib/format';
 import { exportReportCsv, exportReportPdf, exportReportXlsx } from '@/lib/reportExport';
 import { supabase } from '@/lib/supabase';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
 type MonthlyChartDatum = {
@@ -113,6 +114,7 @@ function buildDonutSlices(data: DistributionDatum[]) {
 export default function ReportsScreen() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
+  const isTr = t.locale() === 'tr';
   const [refreshing, setRefreshing] = useState(false);
   const [monthCount, setMonthCount] = useState<3 | 6 | 12>(6);
   const [monthlyData, setMonthlyData] = useState<MonthlyChartDatum[]>([]);
@@ -172,7 +174,7 @@ export default function ReportsScreen() {
           customersResult.error?.message ||
           suppliersResult.error?.message ||
           remindersResult.error?.message ||
-          'Rapor verileri yuklenemedi.'
+          isTr ? 'Rapor verileri yüklenemedi.' : 'Report data could not be loaded.'
       );
     }
 
@@ -207,7 +209,7 @@ export default function ReportsScreen() {
       }
 
       (sale.sale_items ?? []).forEach((item) => {
-        const productName = item.products?.name || 'Urun';
+        const productName = item.products?.name || (isTr ? 'Ürün' : 'Product');
         productTotals.set(productName, (productTotals.get(productName) || 0) + Number(item.total_price || 0));
       });
     });
@@ -297,20 +299,34 @@ export default function ReportsScreen() {
         .filter((reminder) => reminder.due_date <= today)
         .reduce((sum, reminder) => sum + Number(reminder.amount || 0), 0)
     );
-  }, [company, monthCount]);
+  }, [company, isTr, monthCount]);
 
   useEffect(() => {
     void fetchReportData().catch((error: unknown) => {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Rapor verileri yuklenemedi.');
+      Alert.alert(
+        isTr ? 'Hata' : 'Error',
+        error instanceof Error
+          ? error.message
+          : isTr
+            ? 'Rapor verileri yüklenemedi.'
+            : 'Report data could not be loaded.'
+      );
     });
-  }, [fetchReportData]);
+  }, [fetchReportData, isTr]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       await fetchReportData();
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'Rapor verileri yenilenemedi.');
+      Alert.alert(
+        isTr ? 'Hata' : 'Error',
+        error instanceof Error
+          ? error.message
+          : isTr
+            ? 'Rapor verileri yenilenemedi.'
+            : 'Report data could not be refreshed.'
+      );
     } finally {
       setRefreshing(false);
     }
@@ -327,8 +343,8 @@ export default function ReportsScreen() {
   const exportPayload = useMemo(
     () => ({
       baseFileName: `cepte-cari-rapor-${Date.now()}`,
-      title: 'CepteCari Gelismis Rapor',
-      periodLabel: `Periyot: Son ${monthCount} ay`,
+      title: isTr ? 'CepteCari Gelişmiş Rapor' : 'CepteCari Advanced Report',
+      periodLabel: isTr ? `Periyot: Son ${monthCount} ay` : `Period: Last ${monthCount} months`,
       monthlyRows: monthlyData.map((item) => ({
         month: item.label,
         sales: item.sales,
@@ -336,21 +352,24 @@ export default function ReportsScreen() {
         expense: item.expense,
       })),
       summaryRows: [
-        { label: 'Toplam Alacak', value: formatTRY(receivables) },
-        { label: 'Toplam Borc', value: formatTRY(payables) },
-        { label: 'Net Nakit Akisi', value: formatTRY(cashFlow) },
-        { label: 'Ortalama Satis', value: formatTRY(averageSale) },
-        { label: 'Geciken Tahsilat Tutari', value: formatTRY(overdueAmount) },
+        { label: isTr ? 'Toplam Alacak' : 'Total Receivables', value: formatTRY(receivables) },
+        { label: isTr ? 'Toplam Borç' : 'Total Payables', value: formatTRY(payables) },
+        { label: isTr ? 'Net Nakit Akışı' : 'Net Cash Flow', value: formatTRY(cashFlow) },
+        { label: isTr ? 'Ortalama Satış' : 'Average Sale', value: formatTRY(averageSale) },
+        { label: isTr ? 'Geciken Tahsilat Tutarı' : 'Overdue Collection Amount', value: formatTRY(overdueAmount) },
       ],
     }),
-    [averageSale, cashFlow, monthCount, monthlyData, overdueAmount, payables, receivables]
+    [averageSale, cashFlow, isTr, monthCount, monthlyData, overdueAmount, payables, receivables]
   );
 
   const handleExportCsv = async () => {
     try {
       await exportReportCsv(exportPayload);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'CSV disa aktarma basarisiz.');
+      Alert.alert(
+        isTr ? 'Hata' : 'Error',
+        error instanceof Error ? error.message : isTr ? 'CSV dışa aktarma başarısız.' : 'CSV export failed.'
+      );
     }
   };
 
@@ -358,7 +377,10 @@ export default function ReportsScreen() {
     try {
       await exportReportPdf(exportPayload);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'PDF disa aktarma basarisiz.');
+      Alert.alert(
+        isTr ? 'Hata' : 'Error',
+        error instanceof Error ? error.message : isTr ? 'PDF dışa aktarma başarısız.' : 'PDF export failed.'
+      );
     }
   };
 
@@ -366,15 +388,18 @@ export default function ReportsScreen() {
     try {
       await exportReportXlsx(exportPayload);
     } catch (error: unknown) {
-      Alert.alert('Hata', error instanceof Error ? error.message : 'XLSX disa aktarma basarisiz.');
+      Alert.alert(
+        isTr ? 'Hata' : 'Error',
+        error instanceof Error ? error.message : isTr ? 'XLSX dışa aktarma başarısız.' : 'XLSX export failed.'
+      );
     }
   };
 
   const kpiCards = [
-    { label: 'Toplam Alacak', value: formatTRY(receivables), tone: theme.colors.text },
-    { label: 'Toplam Borc', value: formatTRY(payables), tone: theme.colors.danger },
-    { label: 'Net Nakit Akisi', value: formatTRY(cashFlow), tone: cashFlow >= 0 ? theme.colors.success : theme.colors.danger },
-    { label: 'Ortalama Satis', value: formatTRY(averageSale), tone: theme.colors.primary },
+    { label: isTr ? 'Toplam Alacak' : 'Total Receivables', value: formatTRY(receivables), tone: theme.colors.text },
+    { label: isTr ? 'Toplam Borç' : 'Total Payables', value: formatTRY(payables), tone: theme.colors.danger },
+    { label: isTr ? 'Net Nakit Akışı' : 'Net Cash Flow', value: formatTRY(cashFlow), tone: cashFlow >= 0 ? theme.colors.success : theme.colors.danger },
+    { label: isTr ? 'Ortalama Satış' : 'Average Sale', value: formatTRY(averageSale), tone: theme.colors.primary },
   ];
 
   return (
@@ -384,9 +409,13 @@ export default function ReportsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
         <BrandHeroHeader
-          kicker="ANALITIK OZET"
-          title="Gelişmiş Raporlar"
-          subtitle="Donemsel analiz, kritik tahsilatlar ve disa aktarma araclari tek ekranda."
+          kicker={isTr ? 'ANALİTİK ÖZET' : 'ANALYTICS'}
+          title={isTr ? 'Gelişmiş Raporlar' : 'Advanced Reports'}
+          subtitle={
+            isTr
+              ? 'Dönemsel analiz, kritik tahsilatlar ve dışa aktarma araçları tek ekranda.'
+              : 'Period analysis, critical collections, and export tools on one screen.'
+          }
           rightAccessory={
             <TouchableOpacity style={styles.heroBack} onPress={() => router.back()}>
               <ArrowLeft size={18} color="#fff" />
@@ -410,7 +439,7 @@ export default function ReportsScreen() {
                 onPress={() => setMonthCount(count as 3 | 6 | 12)}
               >
                 <Text style={[styles.filterChipText, { color: active ? theme.colors.primary : theme.colors.textMuted }]}>
-                  Son {count} ay
+                  {isTr ? `Son ${count} ay` : `Last ${count} months`}
                 </Text>
               </TouchableOpacity>
             );
@@ -448,19 +477,21 @@ export default function ReportsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Aylik donemsel analiz</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {isTr ? 'Aylık dönemsel analiz' : 'Monthly period analysis'}
+          </Text>
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#3CB7FF' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Satis</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{isTr ? 'Satış' : 'Sales'}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#59C356' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Tahsilat</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{isTr ? 'Tahsilat' : 'Collections'}</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendSwatch, { backgroundColor: '#FF6468' }]} />
-              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>Odeme</Text>
+              <Text style={[styles.legendText, { color: theme.colors.textMuted }]}>{isTr ? 'Ödeme' : 'Payments'}</Text>
             </View>
           </View>
           <View style={styles.chartArea}>
@@ -493,7 +524,9 @@ export default function ReportsScreen() {
 
         <View style={styles.distributionRow}>
           <View style={[styles.distributionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>En cok borclu musteriler</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+              {isTr ? 'En çok borçlu müşteriler' : 'Most indebted customers'}
+            </Text>
             <View style={styles.donutWrap}>
               <Svg width={120} height={120} viewBox="0 0 120 120">
                 <Circle cx="60" cy="60" r="44" stroke={theme.colors.border} strokeWidth="22" fill="none" />
@@ -527,7 +560,9 @@ export default function ReportsScreen() {
           </View>
 
           <View style={[styles.distributionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>En cok gelir ureten urunler</Text>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+              {isTr ? 'En çok gelir üreten ürünler' : 'Top revenue products'}
+            </Text>
             <View style={styles.donutWrap}>
               <Svg width={120} height={120} viewBox="0 0 120 120">
                 <Circle cx="60" cy="60" r="44" stroke={theme.colors.border} strokeWidth="22" fill="none" />
@@ -562,32 +597,44 @@ export default function ReportsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Tahsilat hatirlatma gorunumu</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {isTr ? 'Tahsilat hatırlatma görünümü' : 'Collection reminder overview'}
+          </Text>
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>Bugun veya gecmis vade:</Text>
+            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>
+              {isTr ? 'Bugün veya geçmiş vade:' : 'Due today or earlier:'}
+            </Text>
             <Text style={[styles.summaryValue, { color: theme.colors.danger }]}>{dueReminders}</Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: theme.colors.border }]} />
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>Risk altindaki tutar:</Text>
+            <Text style={[styles.summaryHeading, { color: theme.colors.text }]}>
+              {isTr ? 'Risk altındaki tutar:' : 'Amount at risk:'}
+            </Text>
             <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{formatTRY(overdueAmount)}</Text>
           </View>
           <View style={[styles.footerNote, { backgroundColor: theme.colors.surfaceMuted }]}>
             <TrendingUp size={18} color={theme.colors.success} />
             <Text style={[styles.footerText, { color: theme.colors.textMuted }]}>
-              Disa aktarma ile CSV ve PDF ozetlerini paylasabilir, donemsel grafikten satis ve nakit hareketini takip edebilirsiniz.
+              {isTr
+                ? 'Dışa aktarma ile CSV ve PDF özetlerini paylaşabilir, dönemsel grafikten satış ve nakit hareketini takip edebilirsiniz.'
+                : 'You can share CSV and PDF summaries and track sales and cash movement from the period chart.'}
             </Text>
           </View>
           <View style={[styles.footerNote, { backgroundColor: theme.colors.surfaceMuted }]}>
             <TrendingDown size={18} color={theme.colors.danger} />
             <Text style={[styles.footerText, { color: theme.colors.textMuted }]}>
-              Geciken tahsilat tutari ve musteri dagilimi, hangi hesaplara daha hizli aksiyon almaniz gerektigini gosterir.
+              {isTr
+                ? 'Geciken tahsilat tutarı ve müşteri dağılımı, hangi hesaplara daha hızlı aksiyon almanız gerektiğini gösterir.'
+                : 'Overdue collection totals and customer distribution show which accounts need faster action.'}
             </Text>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Tedarikci odeme dagilimi</Text>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {isTr ? 'Tedarikçi ödeme dağılımı' : 'Supplier payment distribution'}
+          </Text>
           {supplierDistribution.map((item) => (
             <View key={item.label} style={[styles.listRow, { borderBottomColor: theme.colors.border }]}>
               <View style={styles.legendItem}>

@@ -1,42 +1,73 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
-const sections = [
-  {
-    title: 'Veri Sorumlusu',
-    body:
-      'CepteCari uygulamasi kapsaminda hesap, firma ve is kayitlarinin islenmesine iliskin veri sorumlusu uygulamayi sunan isletmedir.',
-  },
-  {
-    title: 'Islenen Veri Kategorileri',
-    body:
-      'Kimlik ve iletisim verileri, firma bilgileri, musteri ve tedarikci kayitlari, satis ve odeme hareketleri, stok ve tahsilat hatirlatma kayitlari islenebilir.',
-  },
-  {
-    title: 'Isleme Amaclari',
-    body:
-      'Hesap yonetimi, veri senkronizasyonu, uygulama guvenligi, destek surecleri, bildirim gonderimi ve yasal yukumluluklerin yerine getirilmesi amaclariyla veri islenir.',
-  },
-  {
-    title: 'Aktarim ve Saklama',
-    body:
-      'Veriler yalnizca hizmetin yurutulmesi icin gerekli altyapi saglayicilarla ve hukuki zorunluluk hallerinde yetkili mercilerle paylasilabilir. Veriler aktif hesap suresince veya yasal saklama sureleri boyunca tutulur.',
-  },
-  {
-    title: 'Ilgili Kisi Haklari',
-    body:
-      'Kullanicilar veri erisim, duzeltme, silme, itiraz ve bilgi talebi gibi kanuni haklarini destek kanali uzerinden kullanabilir.',
-  },
-];
-
 export default function KvkkNoticeScreen() {
+  const isTr = t.locale() === 'tr';
+
+  const sections = isTr
+    ? [
+        {
+          title: 'Veri Sorumlusu',
+          body:
+            'CepteCari uygulaması kapsamında hesap, firma ve iş kayıtlarının işlenmesine ilişkin veri sorumlusu uygulamayı sunan işletmedir.',
+        },
+        {
+          title: 'İşlenen Veri Kategorileri',
+          body:
+            'Kimlik ve iletişim verileri, firma bilgileri, müşteri ve tedarikçi kayıtları, satış ve ödeme hareketleri, stok ve tahsilat hatırlatma kayıtları işlenebilir.',
+        },
+        {
+          title: 'İşleme Amaçları',
+          body:
+            'Hesap yönetimi, veri senkronizasyonu, uygulama güvenliği, destek süreçleri, bildirim gönderimi ve yasal yükümlülüklerin yerine getirilmesi amaçlarıyla veri işlenir.',
+        },
+        {
+          title: 'Aktarım ve Saklama',
+          body:
+            'Veriler yalnızca hizmetin yürütülmesi için gerekli altyapı sağlayıcılarla ve hukuki zorunluluk hâllerinde yetkili mercilerle paylaşılabilir. Veriler aktif hesap süresince veya yasal saklama süreleri boyunca tutulur.',
+        },
+        {
+          title: 'İlgili Kişi Hakları',
+          body:
+            'Kullanıcılar veri erişim, düzeltme, silme, itiraz ve bilgi talebi gibi kanuni haklarını destek kanalı üzerinden kullanabilir.',
+        },
+      ]
+    : [
+        {
+          title: 'Data Controller',
+          body:
+            'For the processing of account, company, and business records within the CepteCari application, the data controller is the business operating the app.',
+        },
+        {
+          title: 'Processed Data Categories',
+          body:
+            'Identity and contact data, company information, customer and supplier records, sales and payment transactions, stock records, and collection reminder records may be processed.',
+        },
+        {
+          title: 'Processing Purposes',
+          body:
+            'Data is processed for account management, data synchronization, app security, support processes, notification delivery, and compliance with legal obligations.',
+        },
+        {
+          title: 'Transfer and Retention',
+          body:
+            'Data may only be shared with infrastructure providers necessary for service delivery and with authorized authorities where legally required. Data is retained while the account is active or for legally mandated retention periods.',
+        },
+        {
+          title: 'Data Subject Rights',
+          body:
+            'Users can exercise legal rights such as access, correction, deletion, objection, and information requests through the support channel.',
+        },
+      ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <BrandHeroHeader
         kicker="KVKK"
-        title="Aydinlatma Metni"
-        subtitle="Son guncelleme: 1 Nisan 2026"
+        title={isTr ? 'Aydınlatma Metni' : 'Privacy Notice'}
+        subtitle={isTr ? 'Son güncelleme: 1 Nisan 2026' : 'Last updated: April 1, 2026'}
       />
 
       {sections.map((section) => (

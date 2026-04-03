@@ -1,6 +1,7 @@
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Locale, getLocale, setLocale as setI18nLocale } from '@/lib/i18n';
+import { setFormattingLocale } from '@/lib/format';
 
 interface LocaleContextType {
   locale: Locale;
@@ -21,6 +22,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         const storedLocale = await AsyncStorage.getItem(LOCALE_STORAGE_KEY);
         if (mounted && (storedLocale === 'tr' || storedLocale === 'en')) {
           setI18nLocale(storedLocale);
+          setFormattingLocale(storedLocale === 'tr' ? 'tr-TR' : 'en-US');
           setLocaleState(storedLocale);
         }
       } catch {
@@ -40,6 +42,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       locale,
       setLocale: (nextLocale: Locale) => {
         setI18nLocale(nextLocale);
+        setFormattingLocale(nextLocale === 'tr' ? 'tr-TR' : 'en-US');
         setLocaleState(nextLocale);
         void AsyncStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
       },

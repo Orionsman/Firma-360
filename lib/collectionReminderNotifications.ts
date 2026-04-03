@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { formatTRY } from '@/lib/format';
 
 type ReminderNotificationRow = {
   id: string;
@@ -103,7 +104,7 @@ export const syncCollectionReminderNotifications = async (
     const identifier = await Notifications.scheduleNotificationAsync({
       content: {
         title: reminder.title,
-        body: `${reminder.customers?.name ? `${reminder.customers.name} - ` : ''}${reminder.note || 'Tahsilat tarihi geldi.'}${reminder.amount ? ` - ${Number(reminder.amount).toLocaleString('tr-TR')} TL` : ''}`,
+        body: `${reminder.customers?.name ? `${reminder.customers.name} - ` : ''}${reminder.note || 'Tahsilat tarihi geldi.'}${reminder.amount ? ` - ${formatTRY(Number(reminder.amount))}` : ''}`,
         sound: false,
       },
       trigger: {

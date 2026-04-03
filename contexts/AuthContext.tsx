@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
+import { t } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
 interface Company {
@@ -42,6 +43,7 @@ interface AuthContextType {
   activeCompanyId: string | null;
   activeRole: CompanyMembership['role'] | null;
   recentAcceptedCompanies: CompanyMembership[];
+  noCompanyAccess: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
@@ -52,6 +54,9 @@ interface AuthContextType {
   createCompanyProfile: (companyName: string) => Promise<void>;
   createAdditionalCompany: (companyName: string) => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
+  deleteCompany: (companyId: string) => Promise<void>;
+  removeCompanyMember: (companyId: string, userId: string) => Promise<void>;
+  revokeInvitation: (invitationId: string) => Promise<void>;
   requestAccountDeletion: (reason?: string) => Promise<void>;
   deleteAccount: (reason?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -63,6 +68,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const ACTIVE_COMPANY_STORAGE_KEY = 'cepte_cari_active_company_id';
 
 const getReadableAuthError = (error: unknown) => {
+  const isTr = t.locale() === 'tr';
   const message =
     error instanceof Error
       ? error.message
@@ -71,19 +77,25 @@ const getReadableAuthError = (error: unknown) => {
           'message' in error &&
           typeof (error as { message?: unknown }).message === 'string'
         ? (error as { message: string }).message
-        : 'Beklenmeyen bir hata oluştu.';
+        : isTr
+          ? 'Beklenmeyen bir hata oluştu.'
+          : 'An unexpected error occurred.';
   const lowered = message.toLowerCase();
 
   if (lowered.includes('email rate limit exceeded')) {
-    return 'Çok fazla deneme yapıldı. Lütfen 1-2 dakika bekleyip tekrar deneyin.';
+    return isTr
+      ? 'Çok fazla deneme yapıldı. Lütfen 1-2 dakika bekleyip tekrar deneyin.'
+      : 'Too many attempts were made. Please wait 1-2 minutes and try again.';
   }
 
   if (lowered.includes('invalid login credentials')) {
-    return 'E-posta veya şifre hatalı.';
+    return isTr ? 'E-posta veya şifre hatalı.' : 'Incorrect email or password.';
   }
 
   if (lowered.includes('email not confirmed')) {
-    return 'E-posta adresinizi doğrulamanız gerekiyor.';
+    return isTr
+      ? 'E-posta adresinizi doğrulamanız gerekiyor.'
+      : 'You need to verify your email address.';
   }
 
   if (
@@ -93,14 +105,18 @@ const getReadableAuthError = (error: unknown) => {
     lowered.includes('forbidden') ||
     lowered.includes('403')
   ) {
-    return 'Supabase yetki ayarı nedeniyle işlem tamamlanamadı. SQL policy ayarları düzeltilmeli veya kullanıcıya SQL Editor üzerinden firma bağlanmalı.';
+    return isTr
+      ? 'Supabase yetki ayarı nedeniyle işlem tamamlanamadı. SQL policy ayarları düzeltilmeli veya kullanıcıya SQL Editor üzerinden firma bağlanmalı.'
+      : 'The operation could not be completed due to Supabase permission settings. SQL policies must be fixed or the user must be linked to a company through the SQL Editor.';
   }
 
   if (
     lowered.includes('schema cache') ||
     (lowered.includes('function') && lowered.includes('not found'))
   ) {
-    return 'Supabase fonksiyonu bulunamadı. Migration SQL dosyaları veritabanına uygulanmamış olabilir.';
+    return isTr
+      ? 'Supabase fonksiyonu bulunamadı. Migration SQL dosyaları veritabanına uygulanmamış olabilir.'
+      : 'The Supabase function could not be found. Migration SQL files may not have been applied to the database.';
   }
 
   return message;
@@ -119,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<CompanyMembership['role'] | null>(null);
   const [recentAcceptedCompanies, setRecentAcceptedCompanies] = useState<CompanyMembership[]>([]);
+  const [noCompanyAccess, setNoCompanyAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const syncUserContext = async (nextUser: User | null) => {
@@ -130,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveCompanyId(null);
       setActiveRole(null);
       setRecentAcceptedCompanies([]);
+      setNoCompanyAccess(false);
       await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
       return;
     }
@@ -156,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCompany(null);
       setActiveCompanyId(null);
       setActiveRole(null);
+      setNoCompanyAccess(false);
       return;
     }
 
@@ -172,6 +191,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberships.find((membership) => membership.company_id === storedCompanyId) ||
       memberships[0] ||
       null;
+
+    setNoCompanyAccess(memberships.length === 0);
 
     setCompanies(memberships);
     setCompany((selectedMembership?.companies as Company | null) ?? null);
@@ -257,7 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!authData.user) {
-      throw new Error('Kayıt başarısız.');
+      throw new Error(t.locale() === 'tr' ? 'Kayıt başarısız.' : 'Registration failed.');
     }
 
     if (!authData.session) {
@@ -276,15 +297,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     companyName: string,
     overrideUserId?: string
   ) => {
+    const isTr = t.locale() === 'tr';
     const resolvedUserId = getUserId(overrideUserId, user);
 
     if (!resolvedUserId) {
-      throw new Error('Oturum bulunamadı. Lütfen yeniden giriş yapın.');
+      throw new Error(
+        isTr ? 'Oturum bulunamadı. Lütfen yeniden giriş yapın.' : 'No session found. Please sign in again.'
+      );
     }
 
     const trimmedName = companyName.trim();
     if (!trimmedName) {
-      throw new Error('Firma adı boş olamaz.');
+      throw new Error(isTr ? 'Firma adı boş olamaz.' : 'Company name cannot be empty.');
     }
 
     const { data: existingMembership, error: membershipError } = await supabase
@@ -321,7 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const createAdditionalCompany = async (companyName: string) => {
     const trimmedName = companyName.trim();
     if (!trimmedName) {
-      throw new Error('Firma adı boş olamaz.');
+      throw new Error(t.locale() === 'tr' ? 'Firma adı boş olamaz.' : 'Company name cannot be empty.');
     }
 
     const { data, error } = await supabase.rpc(
@@ -368,16 +392,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (!nextMembership?.companies) {
-      throw new Error('Firma bulunamadı.');
+      throw new Error(t.locale() === 'tr' ? 'Firma bulunamadı.' : 'Company not found.');
     }
 
     setActiveCompanyId(companyId);
     setCompany(nextMembership.companies);
     setActiveRole(nextMembership.role);
+    setNoCompanyAccess(false);
     setRecentAcceptedCompanies((current) =>
       current.filter((membership) => membership.company_id !== companyId)
     );
     await AsyncStorage.setItem(ACTIVE_COMPANY_STORAGE_KEY, companyId);
+  };
+
+  const deleteCompany = async (companyId: string) => {
+    const { error } = await supabase.rpc('delete_company_for_current_user', {
+      target_company_id: companyId,
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+
+    await syncUserContext(user);
+  };
+
+  const removeCompanyMember = async (companyId: string, userId: string) => {
+    const { error } = await supabase.rpc('remove_company_member', {
+      target_company_id: companyId,
+      target_user_id: userId,
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+
+    await syncUserContext(user);
+  };
+
+  const revokeInvitation = async (invitationId: string) => {
+    const { error } = await supabase.rpc('revoke_team_invitation', {
+      target_invitation_id: invitationId,
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+
+    await syncUserContext(user);
   };
 
   const signOut = async () => {
@@ -416,6 +478,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActiveCompanyId(null);
     setActiveRole(null);
     setRecentAcceptedCompanies([]);
+    setNoCompanyAccess(false);
     await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
   };
 
@@ -446,12 +509,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         activeCompanyId,
         activeRole,
         recentAcceptedCompanies,
+        noCompanyAccess,
         loading,
         signIn,
         signUp,
         createCompanyProfile,
         createAdditionalCompany,
         switchCompany,
+        deleteCompany,
+        removeCompanyMember,
+        revokeInvitation,
         requestAccountDeletion,
         deleteAccount,
         signOut,

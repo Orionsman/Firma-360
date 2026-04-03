@@ -13,36 +13,28 @@ import {
   View,
 } from 'react-native';
 import {
-  Languages,
   Building2,
   ChevronDown,
   ChevronRight,
-  FileLock2,
+  Globe2,
   Info,
   KeyRound,
   LogOut,
   MoonStar,
   Save,
-  ShieldCheck,
   SunMedium,
   Trash2,
   UserRound,
   X,
 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
-import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
-type PanelSection =
-  | 'accountSettings'
-  | 'company'
-  | 'security'
-  | 'delete'
-  | 'language'
-  | 'legal';
+type PanelSection = 'company' | 'account' | 'language' | 'legal';
 
 type UserPanelModalProps = {
   visible: boolean;
@@ -53,12 +45,7 @@ type MenuItem = {
   key: PanelSection;
   label: string;
   icon: typeof UserRound;
-  tone?: 'default' | 'danger';
 };
-
-const companyItems: MenuItem[] = [
-  { key: 'company', label: 'Isletme Bilgileri', icon: Building2 },
-];
 
 export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   const {
@@ -73,7 +60,10 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   } = useAuth();
   const { theme, mode, toggleTheme } = useAppTheme();
   const { locale, setLocale } = useLocale();
+  const { currency, setCurrency, currencyOptions } = useCurrency();
+
   const [activeSection, setActiveSection] = useState<PanelSection | null>(null);
+  const [showCompanyList, setShowCompanyList] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [taxNumber, setTaxNumber] = useState('');
   const [address, setAddress] = useState('');
@@ -84,6 +74,69 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   const [savingCompany, setSavingCompany] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+
+  const isTr = locale === 'tr';
+  const isDark = mode === 'dark';
+  const version = Constants.expoConfig?.version || '1.0.0';
+
+  const text = useMemo(
+    () => ({
+      profile: isTr ? 'Profil' : 'Profile',
+      active: isTr ? 'Aktif' : 'Active',
+      companySwitch: isTr ? 'Firma Geçişi' : 'Company Switch',
+      selectedCompany: isTr ? 'Seçili firma' : 'Selected company',
+      showOtherCompanies: isTr ? 'Diğer firmaları göster' : 'Show other companies',
+      hideOtherCompanies: isTr ? 'Firma listesini gizle' : 'Hide company list',
+      noOtherCompany: isTr ? 'Başka bağlı firma yok.' : 'No other linked companies.',
+      companyInfo: isTr ? 'İşletme Bilgileri' : 'Business Details',
+      accountSettings: isTr ? 'Hesap Ayarları' : 'Account Settings',
+      languageSettings: isTr ? 'Dil Ayarları' : 'Language Settings',
+      legalSupport: isTr ? 'Yasal ve Destek' : 'Legal and Support',
+      companyName: isTr ? 'Firma adı' : 'Company name',
+      taxNumber: isTr ? 'Vergi no' : 'Tax number',
+      phone: isTr ? 'Telefon' : 'Phone',
+      email: 'Email',
+      address: isTr ? 'Adres' : 'Address',
+      save: isTr ? 'Bilgileri Kaydet' : 'Save Details',
+      saving: isTr ? 'Kaydediliyor...' : 'Saving...',
+      password: isTr ? 'Yeni şifre' : 'New password',
+      passwordPlaceholder: isTr ? 'En az 6 karakter' : 'At least 6 characters',
+      updatePassword: isTr ? 'Şifreyi Güncelle' : 'Update Password',
+      updatingPassword: isTr ? 'Güncelleniyor...' : 'Updating...',
+      currency: isTr ? 'Para Birimi' : 'Currency',
+      theme: isTr ? 'Tema' : 'Theme',
+      switchToLight: isTr ? 'Açık moda geç' : 'Switch to light mode',
+      switchToDark: isTr ? 'Koyu moda geç' : 'Switch to dark mode',
+      deleteHint: isTr ? 'Hesap silme işlemi geri alınamaz.' : 'Account deletion cannot be undone.',
+      deletionReason: isTr ? 'Silme nedeni' : 'Deletion reason',
+      deletionPlaceholder: isTr ? 'İsterseniz kısa bir not yazabilirsiniz.' : 'You can add a short note if you want.',
+      deleting: isTr ? 'Hesap siliniyor...' : 'Deleting account...',
+      deleteAccount: isTr ? 'Hesabı Kalıcı Olarak Sil' : 'Delete Account Permanently',
+      logout: isTr ? 'Çıkış Yap' : 'Sign Out',
+      version: isTr ? 'Versiyon' : 'Version',
+      companyUpdated: isTr ? 'Firma bilgileri güncellendi.' : 'Company details updated.',
+      companySaveFailed: isTr ? 'Firma bilgileri kaydedilemedi.' : 'Could not save company details.',
+      passwordUpdated: isTr ? 'Şifreniz güncellendi.' : 'Your password has been updated.',
+      passwordFailed: isTr ? 'Şifre değiştirilemedi.' : 'Could not update the password.',
+      logoutFailed: isTr ? 'Çıkış yapılamadı.' : 'Could not sign out.',
+      companyMissing: isTr ? 'Düzenlenecek firma bulunamadı.' : 'No company found to edit.',
+      companyRequired: isTr ? 'Firma adı boş olamaz.' : 'Company name cannot be empty.',
+      deleteConfirmTitle: isTr ? 'Hesap kalıcı olarak silinsin mi?' : 'Delete account permanently?',
+      deleteConfirmText: isTr
+        ? 'Bu işlem geri alınamaz. Hesabınız ve bağlı veriler silinir veya anonimleştirilir.'
+        : 'This action cannot be undone. Your account and related data will be deleted or anonymized.',
+      cancel: isTr ? 'Vazgeç' : 'Cancel',
+      deleted: isTr ? 'Hesap Silindi' : 'Account Deleted',
+      deletedText: isTr ? 'Hesabınız başarıyla silindi.' : 'Your account has been deleted successfully.',
+      legalLinks: [
+        { label: isTr ? 'Gizlilik Politikası' : 'Privacy Policy', route: '/privacy-policy' as never },
+        { label: isTr ? 'Destek Bilgileri' : 'Support Information', route: '/support' as never },
+        { label: isTr ? 'Kullanım Koşulları' : 'Terms of Service', route: '/terms-of-service' as never },
+        { label: isTr ? 'KVKK Aydınlatma Metni' : 'KVKK Notice', route: '/kvkk-notice' as never },
+      ],
+    }),
+    [isTr]
+  );
 
   useEffect(() => {
     setCompanyName(company?.name || '');
@@ -96,6 +149,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
   useEffect(() => {
     if (!visible) {
       setActiveSection(null);
+      setShowCompanyList(false);
     }
   }, [visible]);
 
@@ -109,29 +163,34 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       .join('');
   }, [company?.name, user?.email]);
 
-  const version = Constants.expoConfig?.version || '1.0.0';
-  const isDark = mode === 'dark';
-  const roleLabels: Record<'owner' | 'admin' | 'user', string> = {
-    owner: 'Owner',
-    admin: 'Admin',
-    user: 'Kullanici',
+  const selectedMembership =
+    companies.find((membership) => membership.company_id === activeCompanyId) ||
+    companies[0] ||
+    null;
+  const otherCompanies = companies.filter(
+    (membership) => membership.company_id !== selectedMembership?.company_id
+  );
+
+  const roleLabel = (role?: 'owner' | 'admin' | 'user') => {
+    if (role === 'owner') return isTr ? 'Sahip' : 'Owner';
+    if (role === 'admin') return isTr ? 'Yönetici' : 'Admin';
+    return isTr ? 'Kullanıcı' : 'User';
   };
-  const accountItems: MenuItem[] = [
-    { key: 'accountSettings', label: 'Hesap Ayarlari', icon: UserRound },
-    { key: 'security', label: 'Sifre Yonetimi', icon: ShieldCheck },
-    { key: 'delete', label: 'Hesabi Sil', icon: Trash2, tone: 'danger' },
-    { key: 'language', label: t.settings.languageTitle, icon: Languages },
-    { key: 'legal', label: t.settings.about.title, icon: Info },
+
+  const menuItems: MenuItem[] = [
+    { key: 'company', label: text.companyInfo, icon: Building2 },
+    { key: 'account', label: text.accountSettings, icon: UserRound },
+    { key: 'language', label: text.languageSettings, icon: Globe2 },
+    { key: 'legal', label: text.legalSupport, icon: Info },
   ];
 
   const handleSaveCompany = async () => {
     if (!company) {
-      Alert.alert('Bilgi', 'Duzenlenecek firma bulunamadi.');
+      Alert.alert(text.profile, text.companyMissing);
       return;
     }
-
     if (!companyName.trim()) {
-      Alert.alert('Hata', 'Firma adi bos olamaz.');
+      Alert.alert(text.profile, text.companyRequired);
       return;
     }
 
@@ -148,17 +207,11 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
         })
         .eq('id', company.id);
 
-      if (error) {
-        throw error;
-      }
-
+      if (error) throw error;
       await refreshCompany();
-      Alert.alert('Basarili', 'Firma bilgileri guncellendi.');
+      Alert.alert(text.profile, text.companyUpdated);
     } catch (error: unknown) {
-      Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Firma bilgileri kaydedilemedi.'
-      );
+      Alert.alert(text.profile, error instanceof Error ? error.message : text.companySaveFailed);
     } finally {
       setSavingCompany(false);
     }
@@ -166,30 +219,45 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 
   const handleChangePassword = async () => {
     if (newPassword.length < 6) {
-      Alert.alert('Hata', 'Yeni sifre en az 6 karakter olmali.');
+      Alert.alert(text.profile, text.passwordPlaceholder);
       return;
     }
 
     setSavingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (error) {
-        throw error;
-      }
-
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
       setNewPassword('');
-      Alert.alert('Basarili', 'Sifreniz guncellendi.');
+      Alert.alert(text.profile, text.passwordUpdated);
     } catch (error: unknown) {
-      Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Sifre degistirilemedi.'
-      );
+      Alert.alert(text.profile, error instanceof Error ? error.message : text.passwordFailed);
     } finally {
       setSavingPassword(false);
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(text.deleteConfirmTitle, text.deleteConfirmText, [
+      { text: text.cancel, style: 'cancel' },
+      {
+        text: text.deleteAccount,
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingAccount(true);
+          try {
+            await deleteAccount(deletionReason);
+            setDeletionReason('');
+            Alert.alert(text.deleted, text.deletedText);
+            onClose();
+            router.replace('/login');
+          } catch (error: unknown) {
+            Alert.alert(text.profile, error instanceof Error ? error.message : text.deleteAccount);
+          } finally {
+            setDeletingAccount(false);
+          }
+        },
+      },
+    ]);
   };
 
   const handleSignOut = async () => {
@@ -198,211 +266,204 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       onClose();
       router.replace('/login');
     } catch (error: unknown) {
-      Alert.alert(
-        'Hata',
-        error instanceof Error ? error.message : 'Cikis yapilamadi.'
-      );
+      Alert.alert(text.profile, error instanceof Error ? error.message : text.logoutFailed);
     }
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Hesap kalici olarak silinsin mi?',
-      'Bu islem geri alinamaz. Hesabiniz ve ona bagli veriler silinir veya anonimlestirilir.',
-      [
-        { text: 'Vazgec', style: 'cancel' },
-        {
-          text: 'Hesabi Sil',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingAccount(true);
-            try {
-              await deleteAccount(deletionReason);
-              setDeletionReason('');
-              Alert.alert('Hesap Silindi', 'Hesabiniz basariyla silindi.');
-              onClose();
-              router.replace('/login');
-            } catch (error: unknown) {
-              Alert.alert(
-                'Hata',
-                error instanceof Error ? error.message : 'Hesap silinemedi.'
-              );
-            } finally {
-              setDeletingAccount(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const toggleSection = (section: PanelSection) => {
-    setActiveSection((current) => (current === section ? null : section));
-  };
-
-  const renderSectionContent = (section: PanelSection) => {
+  const renderSection = (section: PanelSection) => {
     if (section === 'company') {
       return (
         <View
           style={[
-            styles.inlineDetailCard,
+            styles.inlineCard,
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Isletme Bilgileri</Text>
-
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Firma Adi</Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>{text.companyInfo}</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.companyName}</Text>
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={companyName}
             onChangeText={setCompanyName}
           />
-
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Vergi No</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.taxNumber}</Text>
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={taxNumber}
             onChangeText={setTaxNumber}
           />
-
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Telefon</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.phone}</Text>
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={phone}
             onChangeText={setPhone}
           />
-
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>E-posta</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.email}</Text>
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
           />
-
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Adres</Text>
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.address}</Text>
           <TextInput
             style={[
               styles.input,
               styles.textArea,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={address}
             onChangeText={setAddress}
             multiline
             numberOfLines={4}
           />
-
           <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: theme.colors.primary },
-              savingCompany && styles.buttonDisabled,
-            ]}
+            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleSaveCompany}
             disabled={savingCompany}
           >
             <Save size={16} color="#fff" />
-            <Text style={styles.primaryButtonText}>
-              {savingCompany ? 'Kaydediliyor...' : 'Bilgileri Kaydet'}
-            </Text>
+            <Text style={styles.primaryButtonText}>{savingCompany ? text.saving : text.save}</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    if (section === 'accountSettings') {
+    if (section === 'account') {
       return (
         <View
           style={[
-            styles.inlineDetailCard,
+            styles.inlineCard,
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Hesap Ayarlari</Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>E-posta</Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>{text.accountSettings}</Text>
+          <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>{text.email}</Text>
           <Text style={[styles.infoValue, { color: theme.colors.text }]}>{user?.email || '-'}</Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>Firma</Text>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {company?.name || 'Firma olusturulmamis'}
-          </Text>
-        </View>
-      );
-    }
 
-    if (section === 'security') {
-      return (
-        <View
-          style={[
-            styles.inlineDetailCard,
-            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
-          ]}
-        >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>Sifre Yonetimi</Text>
-          <Text style={[styles.label, { color: theme.colors.textMuted }]}>Yeni Sifre</Text>
+          <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>{text.currency}</Text>
+          <View style={styles.optionRow}>
+            {currencyOptions.map((option) => {
+              const active = currency === option.code;
+              return (
+                <TouchableOpacity
+                  key={option.code}
+                  style={[
+                    styles.currencyOption,
+                    {
+                      backgroundColor: active ? theme.colors.primarySoft : theme.colors.surface,
+                      borderColor: active ? theme.colors.primary : theme.colors.border,
+                    },
+                  ]}
+                  onPress={() => setCurrency(option.code)}
+                >
+                  <Text
+                    style={[
+                      styles.currencyOptionText,
+                      { color: active ? theme.colors.primaryStrong : theme.colors.text },
+                    ]}
+                  >
+                    {option.code}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.currencyOptionMeta,
+                      { color: active ? theme.colors.primaryStrong : theme.colors.textMuted },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>{text.theme}</Text>
+          <TouchableOpacity
+            style={[
+              styles.secondaryAction,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={toggleTheme}
+          >
+            {isDark ? (
+              <SunMedium size={16} color={theme.colors.accent} />
+            ) : (
+              <MoonStar size={16} color={theme.colors.primary} />
+            )}
+            <Text style={[styles.secondaryActionText, { color: theme.colors.text }]}>
+              {isDark ? text.switchToLight : text.switchToDark}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.password}</Text>
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
             ]}
             value={newPassword}
             onChangeText={setNewPassword}
             secureTextEntry
-            placeholder="En az 6 karakter"
+            placeholder={text.passwordPlaceholder}
             placeholderTextColor={theme.colors.textSoft}
           />
-
           <TouchableOpacity
-            style={[
-              styles.primaryButton,
-              { backgroundColor: theme.colors.primary },
-              savingPassword && styles.buttonDisabled,
-            ]}
+            style={[styles.primaryButton, { backgroundColor: theme.colors.primary }]}
             onPress={handleChangePassword}
             disabled={savingPassword}
           >
             <KeyRound size={16} color="#fff" />
             <Text style={styles.primaryButtonText}>
-              {savingPassword ? 'Guncelleniyor...' : 'Sifreyi Guncelle'}
+              {savingPassword ? text.updatingPassword : text.updatePassword}
             </Text>
           </TouchableOpacity>
+
+          <View
+            style={[
+              styles.deleteBox,
+              { backgroundColor: theme.colors.dangerSoft, borderColor: theme.colors.danger },
+            ]}
+          >
+            <Text style={[styles.deleteHint, { color: theme.colors.danger }]}>{text.deleteHint}</Text>
+            <Text style={[styles.label, { color: theme.colors.textMuted }]}>{text.deletionReason}</Text>
+            <TextInput
+              style={[
+                styles.input,
+                styles.textArea,
+                { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text },
+              ]}
+              value={deletionReason}
+              onChangeText={setDeletionReason}
+              multiline
+              numberOfLines={4}
+              placeholder={text.deletionPlaceholder}
+              placeholderTextColor={theme.colors.textSoft}
+            />
+            <TouchableOpacity
+              style={[styles.dangerButton, { backgroundColor: theme.colors.danger }]}
+              onPress={handleDeleteAccount}
+              disabled={deletingAccount}
+            >
+              <Trash2 size={16} color="#fff" />
+              <Text style={styles.primaryButtonText}>
+                {deletingAccount ? text.deleting : text.deleteAccount}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -411,166 +472,51 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
       return (
         <View
           style={[
-            styles.inlineDetailCard,
+            styles.inlineCard,
             { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
           ]}
         >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
-            {t.settings.languageTitle}
-          </Text>
-          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
-            {t.settings.languageDescription}
-          </Text>
+          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>{text.languageSettings}</Text>
           <View
             style={[
               styles.languageSummary,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border,
-              },
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
             ]}
           >
-            <Text style={[styles.languageSummaryLabel, { color: theme.colors.textMuted }]}>
-              {t.settings.activeLanguage}
+            <Text style={[styles.infoLabel, { color: theme.colors.textSoft }]}>
+              {isTr ? 'Aktif dil' : 'Active language'}
             </Text>
-            <Text style={[styles.languageSummaryValue, { color: theme.colors.text }]}>
-              {locale === 'tr' ? t.common.languages.turkish : t.common.languages.english}
+            <Text style={[styles.infoValue, { color: theme.colors.text }]}>
+              {locale === 'tr' ? 'Türkçe' : 'English'}
             </Text>
           </View>
           <View style={styles.optionRow}>
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                {
-                  backgroundColor:
-                    locale === 'tr' ? theme.colors.primarySoft : theme.colors.surface,
-                  borderColor: locale === 'tr' ? theme.colors.primary : theme.colors.border,
-                },
-              ]}
-              onPress={() => setLocale('tr')}
-            >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  { color: locale === 'tr' ? theme.colors.primaryStrong : theme.colors.text },
-                ]}
-              >
-                {t.common.languages.turkish}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.languageOption,
-                {
-                  backgroundColor:
-                    locale === 'en' ? theme.colors.primarySoft : theme.colors.surface,
-                  borderColor: locale === 'en' ? theme.colors.primary : theme.colors.border,
-                },
-              ]}
-              onPress={() => setLocale('en')}
-            >
-              <Text
-                style={[
-                  styles.languageOptionText,
-                  { color: locale === 'en' ? theme.colors.primaryStrong : theme.colors.text },
-                ]}
-              >
-                {t.common.languages.english}
-              </Text>
-            </TouchableOpacity>
+            {(['tr', 'en'] as const).map((option) => {
+              const active = locale === option;
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.languageOption,
+                    {
+                      backgroundColor: active ? theme.colors.primarySoft : theme.colors.surface,
+                      borderColor: active ? theme.colors.primary : theme.colors.border,
+                    },
+                  ]}
+                  onPress={() => setLocale(option)}
+                >
+                  <Text
+                    style={[
+                      styles.languageOptionText,
+                      { color: active ? theme.colors.primaryStrong : theme.colors.text },
+                    ]}
+                  >
+                    {option === 'tr' ? 'Türkçe' : 'English'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </View>
-      );
-    }
-
-    if (section === 'legal') {
-      return (
-        <View
-          style={[
-            styles.inlineDetailCard,
-            { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
-          ]}
-        >
-          <Text style={[styles.detailTitle, { color: theme.colors.text }]}>
-            {t.settings.about.title}
-          </Text>
-          <Text style={[styles.inlineBodyText, { color: theme.colors.textMuted }]}>
-            {t.settings.about.text}
-          </Text>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/privacy-policy' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.about.privacy}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              styles.actionSpacing,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/account-deletion' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.about.deletionInfo}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              styles.actionSpacing,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/terms-of-service' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.about.terms}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              styles.actionSpacing,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/kvkk-notice' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.about.kvkk}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.secondaryAction,
-              styles.actionSpacing,
-              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
-            ]}
-            onPress={() => {
-              onClose();
-              router.push('/support' as never);
-            }}
-          >
-            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
-              {t.settings.about.support}
-            </Text>
-          </TouchableOpacity>
         </View>
       );
     }
@@ -578,85 +524,29 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
     return (
       <View
         style={[
-          styles.inlineDetailCard,
-          styles.dangerCard,
-          { backgroundColor: theme.colors.dangerSoft, borderTopColor: theme.colors.danger },
+          styles.inlineCard,
+          { backgroundColor: theme.colors.surfaceMuted, borderTopColor: theme.colors.border },
         ]}
       >
-        <Text style={[styles.detailTitle, styles.dangerTitle]}>Hesabi Kalici Olarak Sil</Text>
-        <Text style={styles.dangerText}>
-          Bu islem geri alinamaz. Hesabiniz ve iliskili uygulama verileri silinir veya anonimlestirilir.
-        </Text>
-
-        <Text style={[styles.label, { color: theme.colors.textMuted }]}>Silme Nedeni</Text>
-        <TextInput
-          style={[
-            styles.input,
-            styles.textArea,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border,
-              color: theme.colors.text,
-            },
-          ]}
-          value={deletionReason}
-          onChangeText={setDeletionReason}
-          multiline
-          numberOfLines={4}
-          placeholder="Silme islemiyle ilgili kisa bir not yazabilirsiniz."
-          placeholderTextColor={theme.colors.textSoft}
-        />
-
-        <View style={styles.inlineInfo}>
-          <FileLock2 size={16} color={theme.colors.danger} />
-          <Text style={[styles.inlineInfoText, { color: theme.colors.danger }]}>
-            Islem tamamlandiginda cikis yapilir ve hesaba yeniden erisilemez.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.dangerButton,
-            { backgroundColor: theme.colors.danger },
-            deletingAccount && styles.buttonDisabled,
-          ]}
-          onPress={handleDeleteAccount}
-          disabled={deletingAccount}
-        >
-          <Trash2 size={16} color="#fff" />
-          <Text style={styles.primaryButtonText}>
-            {deletingAccount ? 'Hesap Siliniyor...' : 'Hesabi Kalici Olarak Sil'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  const renderMenuItem = (item: MenuItem) => {
-    const Icon = item.icon;
-    const active = activeSection === item.key;
-    const danger = item.tone === 'danger';
-    const color = danger ? theme.colors.danger : theme.colors.text;
-    const iconColor = danger ? theme.colors.danger : theme.colors.primary;
-
-    return (
-      <View key={item.key}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => toggleSection(item.key)}
-          activeOpacity={0.86}
-        >
-          <View style={styles.menuItemLeft}>
-            <Icon size={18} color={iconColor} />
-            <Text style={[styles.menuItemText, { color }]}>{item.label}</Text>
-          </View>
-          {active ? (
-            <ChevronDown size={18} color={theme.colors.textSoft} />
-          ) : (
-            <ChevronRight size={18} color={theme.colors.textSoft} />
-          )}
-        </TouchableOpacity>
-        {active ? renderSectionContent(item.key) : null}
+        <Text style={[styles.detailTitle, { color: theme.colors.text }]}>{text.legalSupport}</Text>
+        {text.legalLinks.map((item, index) => (
+          <TouchableOpacity
+            key={item.route}
+            style={[
+              styles.secondaryAction,
+              index > 0 && styles.actionSpacing,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+            onPress={() => {
+              onClose();
+              router.push(item.route);
+            }}
+          >
+            <Text style={[styles.secondaryActionText, { color: theme.colors.primary }]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   };
@@ -667,7 +557,7 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: theme.colors.backgroundSecondary }]}>
           <View style={styles.topBar}>
-            <Text style={[styles.topTitle, { color: theme.colors.text }]}>Profil</Text>
+            <Text style={[styles.topTitle, { color: theme.colors.text }]}>{text.profile}</Text>
             <TouchableOpacity
               style={[styles.closeButton, { backgroundColor: theme.colors.surfaceMuted }]}
               onPress={onClose}
@@ -692,89 +582,123 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
                 </Text>
                 <View style={styles.statusRow}>
                   <View style={styles.statusDot} />
-                  <Text style={[styles.statusText, { color: theme.colors.textMuted }]}>Aktif</Text>
+                  <Text style={[styles.statusText, { color: theme.colors.textMuted }]}>
+                    {text.active}
+                  </Text>
                 </View>
               </View>
-              <TouchableOpacity
-                style={[styles.profileThemeButton, { backgroundColor: theme.colors.surfaceMuted }]}
-                onPress={toggleTheme}
-                activeOpacity={0.86}
-              >
-                {mode === 'dark' ? (
-                  <SunMedium size={16} color={theme.colors.accent} />
-                ) : (
-                  <MoonStar size={16} color={theme.colors.primary} />
-                )}
-              </TouchableOpacity>
             </View>
 
             <View
               style={[
-                styles.companySwitcherCard,
+                styles.switcherCard,
                 { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
               ]}
             >
-              <Text style={[styles.companySwitcherTitle, { color: theme.colors.text }]}>
-                Firma Gecisi
-              </Text>
-              <Text style={[styles.companySwitcherText, { color: theme.colors.textMuted }]}>
-                Aktif firmayi buradan degistirebilirsin.
-              </Text>
-              <View style={styles.companySwitcherList}>
-                {companies.map((membership) => {
-                  const isActive = membership.company_id === activeCompanyId;
-
-                  return (
-                    <TouchableOpacity
-                      key={membership.company_id}
-                      style={[
-                        styles.companySwitcherChip,
-                        {
-                          backgroundColor: isActive
-                            ? theme.colors.primarySoft
-                            : theme.colors.surfaceMuted,
-                          borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                        },
-                      ]}
-                      onPress={() => void switchCompany(membership.company_id)}
-                    >
-                      <Text
-                        style={[
-                          styles.companySwitcherChipText,
-                          { color: isActive ? theme.colors.primaryStrong : theme.colors.text },
-                        ]}
-                      >
-                        {membership.companies?.name} ({roleLabels[membership.role]})
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View style={styles.switcherHeader}>
+                <View style={styles.switcherTitleWrap}>
+                  <Text style={[styles.switcherTitle, { color: theme.colors.text }]}>
+                    {text.companySwitch}
+                  </Text>
+                  <Text style={[styles.switcherMeta, { color: theme.colors.textMuted }]}>
+                    {text.selectedCompany}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.switcherToggle, { backgroundColor: theme.colors.surfaceMuted }]}
+                  onPress={() => setShowCompanyList((current) => !current)}
+                >
+                  <Text style={[styles.switcherToggleText, { color: theme.colors.text }]}>
+                    {showCompanyList ? text.hideOtherCompanies : text.showOtherCompanies}
+                  </Text>
+                </TouchableOpacity>
               </View>
+
+              <View
+                style={[
+                  styles.selectedCompanyChip,
+                  { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary },
+                ]}
+              >
+                <Text style={[styles.selectedCompanyChipText, { color: theme.colors.primaryStrong }]}>
+                  {selectedMembership?.companies?.name || 'CepteCari'}
+                </Text>
+                <Text style={[styles.selectedCompanyRole, { color: theme.colors.primaryStrong }]}>
+                  {roleLabel(selectedMembership?.role)}
+                </Text>
+              </View>
+
+              {showCompanyList ? (
+                <View style={styles.switcherList}>
+                  {otherCompanies.length === 0 ? (
+                    <Text style={[styles.noOtherCompanyText, { color: theme.colors.textMuted }]}>
+                      {text.noOtherCompany}
+                    </Text>
+                  ) : (
+                    otherCompanies.map((membership) => (
+                      <TouchableOpacity
+                        key={membership.company_id}
+                        style={[
+                          styles.switcherItem,
+                          {
+                            backgroundColor: theme.colors.surfaceMuted,
+                            borderColor: theme.colors.border,
+                          },
+                        ]}
+                        onPress={() => void switchCompany(membership.company_id)}
+                      >
+                        <Text style={[styles.switcherItemText, { color: theme.colors.text }]}>
+                          {membership.companies?.name}
+                        </Text>
+                        <Text style={[styles.switcherItemRole, { color: theme.colors.textMuted }]}>
+                          {roleLabel(membership.role)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </View>
+              ) : null}
             </View>
 
-            <Text style={[styles.groupLabel, { color: theme.colors.textSoft }]}>ISLETME</Text>
             <View style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}>
-              {companyItems.map(renderMenuItem)}
-            </View>
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const active = activeSection === item.key;
 
-            <Text style={[styles.groupLabel, { color: theme.colors.textSoft }]}>HESAP</Text>
-            <View style={[styles.groupCard, { backgroundColor: theme.colors.surface }]}>
-              {accountItems.map(renderMenuItem)}
+                return (
+                  <View key={item.key}>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => setActiveSection((current) => (current === item.key ? null : item.key))}
+                    >
+                      <View style={styles.menuItemLeft}>
+                        <Icon size={18} color={theme.colors.primary} />
+                        <Text style={[styles.menuItemText, { color: theme.colors.text }]}>{item.label}</Text>
+                      </View>
+                      {active ? (
+                        <ChevronDown size={18} color={theme.colors.textSoft} />
+                      ) : (
+                        <ChevronRight size={18} color={theme.colors.textSoft} />
+                      )}
+                    </TouchableOpacity>
+                    {active ? renderSection(item.key) : null}
+                  </View>
+                );
+              })}
             </View>
 
             <TouchableOpacity
               style={[styles.logoutRow, { backgroundColor: theme.colors.surface }]}
               onPress={handleSignOut}
-              activeOpacity={0.86}
             >
               <View style={styles.menuItemLeft}>
                 <LogOut size={18} color={theme.colors.danger} />
-                <Text style={[styles.menuItemText, styles.dangerMenuText]}>Cikis Yap</Text>
+                <Text style={[styles.menuItemText, { color: theme.colors.danger }]}>{text.logout}</Text>
               </View>
             </TouchableOpacity>
 
             <View style={[styles.versionCard, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.versionLabel, { color: theme.colors.textSoft }]}>Versiyon</Text>
+              <Text style={[styles.versionLabel, { color: theme.colors.textSoft }]}>{text.version}</Text>
               <Text style={[styles.versionValue, { color: theme.colors.textSoft }]}>{version}</Text>
             </View>
           </ScrollView>
@@ -785,14 +709,8 @@ export function UserPanelModal({ visible, onClose }: UserPanelModalProps) {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.54)',
-  },
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.54)' },
   sheet: {
     maxHeight: '94%',
     borderTopLeftRadius: 26,
@@ -806,10 +724,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  topTitle: {
-    ...typography.heading,
-    fontSize: 18,
-  },
+  topTitle: { ...typography.heading, fontSize: 18 },
   closeButton: {
     position: 'absolute',
     right: 14,
@@ -820,46 +735,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  content: {
-    padding: 14,
-    paddingBottom: 24,
-  },
+  content: { padding: 14, paddingBottom: 24 },
   profileCard: {
     borderRadius: 14,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
-  },
-  companySwitcherCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 16,
     marginBottom: 16,
-  },
-  companySwitcherTitle: {
-    ...typography.title,
-    fontSize: 18,
-  },
-  companySwitcherText: {
-    ...typography.body,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  companySwitcherList: {
-    gap: 10,
-    marginTop: 14,
-  },
-  companySwitcherChip: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  companySwitcherChipText: {
-    ...typography.heading,
-    fontSize: 14,
   },
   avatarBadge: {
     width: 58,
@@ -869,31 +751,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 14,
   },
-  avatarBadgeText: {
-    ...typography.heading,
-    color: '#fff',
-    fontSize: 15,
-  },
-  profileText: {
-    flex: 1,
-  },
-  profileThemeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 12,
-  },
-  profileName: {
-    ...typography.title,
-    fontSize: 20,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 5,
-  },
+  avatarBadgeText: { ...typography.heading, color: '#fff', fontSize: 15 },
+  profileText: { flex: 1 },
+  profileName: { ...typography.title, fontSize: 20 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
   statusDot: {
     width: 8,
     height: 8,
@@ -901,21 +762,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#2ecb5f',
     marginRight: 6,
   },
-  statusText: {
-    ...typography.caption,
-    fontSize: 13,
-  },
-  groupLabel: {
-    ...typography.label,
-    fontSize: 12,
-    marginBottom: 8,
-    marginLeft: 2,
-  },
-  groupCard: {
+  statusText: { ...typography.body, fontSize: 13 },
+  switcherCard: {
     borderRadius: 14,
-    overflow: 'hidden',
-    marginBottom: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
   },
+  switcherHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    alignItems: 'center',
+  },
+  switcherTitleWrap: { flex: 1 },
+  switcherTitle: { ...typography.title, fontSize: 18 },
+  switcherMeta: { ...typography.body, fontSize: 13, marginTop: 4 },
+  switcherToggle: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  switcherToggleText: { ...typography.label, fontSize: 12 },
+  selectedCompanyChip: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginTop: 14,
+  },
+  selectedCompanyChipText: { ...typography.heading, fontSize: 14 },
+  selectedCompanyRole: { ...typography.bodyStrong, fontSize: 12, marginTop: 4 },
+  switcherList: { gap: 10, marginTop: 12 },
+  switcherItem: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  switcherItemText: { ...typography.heading, fontSize: 14 },
+  switcherItemRole: { ...typography.body, fontSize: 12, marginTop: 4 },
+  noOtherCompanyText: { ...typography.body, fontSize: 13 },
+  groupCard: { borderRadius: 14, overflow: 'hidden', marginBottom: 14 },
   menuItem: {
     minHeight: 54,
     paddingHorizontal: 14,
@@ -923,46 +811,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  menuItemText: {
-    ...typography.bodyStrong,
-    fontSize: 17,
-  },
-  inlineDetailCard: {
-    borderTopWidth: 1,
-    padding: 14,
-  },
-  detailTitle: {
-    ...typography.title,
-    fontSize: 18,
-    marginBottom: 10,
-  },
-  inlineBodyText: {
-    ...typography.body,
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  infoLabel: {
-    ...typography.label,
-    fontSize: 12,
-    marginTop: 8,
-  },
-  infoValue: {
-    ...typography.bodyStrong,
-    fontSize: 15,
-    marginTop: 4,
-  },
-  label: {
-    ...typography.label,
-    fontSize: 12,
-    marginBottom: 8,
-    marginTop: 8,
-  },
+  menuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  menuItemText: { ...typography.bodyStrong, fontSize: 17 },
+  inlineCard: { borderTopWidth: 1, padding: 14 },
+  detailTitle: { ...typography.title, fontSize: 18, marginBottom: 10 },
+  label: { ...typography.label, fontSize: 12, marginBottom: 8, marginTop: 8 },
   input: {
     borderWidth: 1,
     borderRadius: 12,
@@ -970,61 +823,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
   },
-  textArea: {
-    minHeight: 92,
-    textAlignVertical: 'top',
-  },
-  secondaryAction: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryActionText: {
-    ...typography.heading,
-    fontSize: 14,
-  },
-  actionSpacing: {
-    marginTop: 10,
-  },
-  languageSummary: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginTop: 14,
-  },
-  languageSummaryLabel: {
-    ...typography.label,
-    fontSize: 12,
-  },
-  languageSummaryValue: {
-    ...typography.bodyStrong,
-    fontSize: 15,
-    marginTop: 4,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 14,
-  },
-  languageOption: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageOptionText: {
-    ...typography.heading,
-    fontSize: 14,
-  },
+  textArea: { minHeight: 92, textAlignVertical: 'top' },
   primaryButton: {
     marginTop: 16,
     borderRadius: 12,
@@ -1034,38 +833,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  primaryButtonText: {
-    ...typography.heading,
-    color: '#fff',
-    fontSize: 14,
-  },
-  dangerCard: {
-    borderWidth: 1,
-    borderColor: 'rgba(255,93,103,0.24)',
-  },
-  dangerTitle: {
-    color: '#ff5d67',
-  },
-  dangerText: {
-    ...typography.body,
-    color: '#ff9aa0',
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  inlineInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
-  inlineInfoText: {
-    ...typography.caption,
-    fontSize: 13,
-    flex: 1,
-  },
+  primaryButtonText: { ...typography.heading, color: '#fff', fontSize: 14 },
   dangerButton: {
-    marginTop: 16,
+    marginTop: 14,
     borderRadius: 12,
     paddingVertical: 13,
     alignItems: 'center',
@@ -1073,33 +843,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  logoutRow: {
+  deleteBox: {
+    borderWidth: 1,
     borderRadius: 14,
-    paddingHorizontal: 14,
-    minHeight: 54,
-    justifyContent: 'center',
-    marginBottom: 14,
+    padding: 14,
+    marginTop: 16,
   },
-  dangerMenuText: {
-    color: '#ff5d67',
+  deleteHint: { ...typography.body, fontSize: 13, lineHeight: 19 },
+  infoLabel: { ...typography.label, fontSize: 12, marginTop: 8 },
+  infoValue: { ...typography.bodyStrong, fontSize: 15, marginTop: 4 },
+  optionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  currencyOption: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minWidth: 132,
+  },
+  currencyOptionText: { ...typography.heading, fontSize: 13 },
+  currencyOptionMeta: { ...typography.body, fontSize: 11, marginTop: 4 },
+  languageSummary: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  languageOption: {
+    flex: 1,
+    minWidth: 120,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  languageOptionText: { ...typography.heading, fontSize: 14 },
+  secondaryAction: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryActionText: { ...typography.heading, fontSize: 14 },
+  actionSpacing: { marginTop: 10 },
+  logoutRow: {
+    minHeight: 54,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   versionCard: {
     borderRadius: 14,
-    minHeight: 46,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
   },
-  versionLabel: {
-    ...typography.label,
-    fontSize: 12,
-  },
-  versionValue: {
-    ...typography.caption,
-    fontSize: 12,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  versionLabel: { ...typography.label, fontSize: 12 },
+  versionValue: { ...typography.body, fontSize: 13 },
 });

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAppTheme } from '@/contexts/ThemeContext';
+import { t } from '@/lib/i18n';
 import { FirmaLogo } from '@/components/FirmaLogo';
 import { typography } from '@/lib/typography';
 
@@ -18,13 +19,15 @@ type BrandHeroHeaderProps = {
 export function BrandHeroHeader({
   title,
   subtitle,
-  brandSubtitle = 'Cari takibin cebinde',
+  brandSubtitle,
   kicker = 'CEPTECARI',
   rightAccessory,
   accessoryBelow = false,
   children,
 }: BrandHeroHeaderProps) {
   const { theme } = useAppTheme();
+  const resolvedBrandSubtitle =
+    brandSubtitle ?? (t.locale() === 'tr' ? 'Cari takibin cebinde' : 'Account tracking in your pocket');
 
   return (
     <LinearGradient
@@ -50,7 +53,7 @@ export function BrandHeroHeader({
             <View style={styles.brandText}>
               <Text style={styles.brandTitle}>CepteCari</Text>
               <Text style={styles.brandKicker}>{kicker}</Text>
-              <Text style={styles.brandSubtitle}>{brandSubtitle}</Text>
+              <Text style={styles.brandSubtitle}>{resolvedBrandSubtitle}</Text>
             </View>
           </View>
         </View>

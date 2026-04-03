@@ -8,17 +8,22 @@ import {
   Users,
   Wallet,
 } from 'lucide-react-native';
+import { useLocale } from '@/contexts/LocaleContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { typography } from '@/lib/typography';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const { locale } = useLocale();
+  const { currency } = useCurrency();
   const bottomInset =
     Platform.OS === 'android' ? Math.max(insets.bottom, 12) : insets.bottom;
 
   return (
     <Tabs
+      key={`${locale}-${currency}`}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -42,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Ana Sayfa',
+          title: locale === 'tr' ? 'Ana Sayfa' : 'Home',
           tabBarIcon: ({ size, color }) => (
             <LayoutDashboard size={size} color={color} />
           ),
@@ -51,21 +56,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="customers"
         options={{
-          title: 'Cari',
+          title: locale === 'tr' ? 'Cari' : 'Accounts',
           tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="products"
         options={{
-          title: 'Stok',
+          title: locale === 'tr' ? 'Stok' : 'Stock',
           tabBarIcon: ({ size, color }) => <Package size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="sales"
         options={{
-          title: 'Satışlar',
+          title: locale === 'tr' ? 'Satışlar' : 'Sales',
           tabBarIcon: ({ size, color }) => (
             <ShoppingCart size={size} color={color} />
           ),
@@ -74,7 +79,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Ödemeler',
+          title: locale === 'tr' ? 'Ödemeler' : 'Payments',
           tabBarIcon: ({ size, color }) => <Wallet size={size} color={color} />,
         }}
       />

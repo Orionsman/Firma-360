@@ -13,6 +13,7 @@ import {
 import { ArrowRight, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { FirmaLogo } from '@/components/FirmaLogo';
 import { t } from '@/lib/i18n';
@@ -27,6 +28,7 @@ export default function Register() {
   const [successMessage, setSuccessMessage] = useState('');
   const { signUp } = useAuth();
   const { theme } = useAppTheme();
+  const { locale, setLocale } = useLocale();
 
   const handleRegister = async () => {
     setErrorMessage('');
@@ -97,6 +99,30 @@ export default function Register() {
               <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
                 {t.auth.register.heroSubtitle}
               </Text>
+            </View>
+            <View style={[styles.localeSwitcher, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+              {(['tr', 'en'] as const).map((option) => {
+                const active = locale === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.localeButton,
+                      active && { backgroundColor: theme.colors.primary },
+                    ]}
+                    onPress={() => setLocale(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.localeButtonText,
+                        { color: active ? '#fff' : theme.colors.textMuted },
+                      ]}
+                    >
+                      {option.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
@@ -286,6 +312,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  localeSwitcher: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 999,
+    padding: 4,
+    gap: 4,
+  },
+  localeButton: {
+    minWidth: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  localeButtonText: {
+    ...typography.label,
+    fontSize: 12,
   },
   heroLogoShell: {
     width: 86,

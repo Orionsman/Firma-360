@@ -4,6 +4,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
 import { CalendarDays } from 'lucide-react-native';
+import { formatAppDate } from '@/lib/format';
 import { typography } from '@/lib/typography';
 
 type DateFieldProps = {
@@ -74,7 +75,7 @@ export function DateField({
         activeOpacity={0.85}
       >
         <Text style={[styles.value, { color: textColor }]}>
-          {selectedDate.toLocaleDateString('tr-TR')}
+          {formatAppDate(selectedDate)}
         </Text>
         <CalendarDays size={18} color={accentColor} />
       </TouchableOpacity>

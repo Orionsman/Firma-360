@@ -1,42 +1,73 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
-const sections = [
-  {
-    title: 'Toplanan Veriler',
-    body:
-      'Hesap bilgileri, firma profili, musteriler, tedarikciler, urunler, satislar, odemeler ve stok hareketleri gibi uygulamaya girdiginiz is verileri saklanir.',
-  },
-  {
-    title: 'Verilerin Kullanimi',
-    body:
-      'Bu veriler hesabinizi yonetmek, firma kayitlarini senkronize etmek, guvenligi saglamak ve destek sunmak icin kullanilir.',
-  },
-  {
-    title: 'Veri Saklama',
-    body:
-      'Hesabiniz aktif oldugu surece veriler saklanir. Hesap silme islemi baslatildiginda, yasal veya finansal saklama zorunlulugu bulunmayan veriler silinir veya anonimlestirilir.',
-  },
-  {
-    title: 'Veri Paylasimi',
-    body:
-      'Veriler satilmaz. Yalnizca uygulamayi calistirmak icin gerekli altyapi ve servis saglayicilarla paylasilir.',
-  },
-  {
-    title: 'Kullanici Haklari',
-    body:
-      'Kullanicilar firma bilgilerini uygulama icinde guncelleyebilir ve hesaplarini uygulama icinden silebilir.',
-  },
-];
-
 export default function PrivacyPolicyScreen() {
+  const isTr = t.locale() === 'tr';
+
+  const sections = isTr
+    ? [
+        {
+          title: 'Toplanan Veriler',
+          body:
+            'Hesap bilgileri, firma profili, müşteriler, tedarikçiler, ürünler, satışlar, ödemeler ve stok hareketleri gibi uygulamaya girdiğiniz iş verileri saklanır.',
+        },
+        {
+          title: 'Verilerin Kullanımı',
+          body:
+            'Bu veriler hesabınızı yönetmek, firma kayıtlarını senkronize etmek, güvenliği sağlamak ve destek sunmak için kullanılır.',
+        },
+        {
+          title: 'Veri Saklama',
+          body:
+            'Hesabınız aktif olduğu sürece veriler saklanır. Hesap silme işlemi başlatıldığında, yasal veya finansal saklama zorunluluğu bulunmayan veriler silinir veya anonimleştirilir.',
+        },
+        {
+          title: 'Veri Paylaşımı',
+          body:
+            'Veriler satılmaz. Yalnızca uygulamayı çalıştırmak için gerekli altyapı ve servis sağlayıcılarla paylaşılır.',
+        },
+        {
+          title: 'Kullanıcı Hakları',
+          body:
+            'Kullanıcılar firma bilgilerini uygulama içinde güncelleyebilir ve hesaplarını uygulama içinden silebilir.',
+        },
+      ]
+    : [
+        {
+          title: 'Collected Data',
+          body:
+            'Business data you enter into the app such as account details, company profile, customers, suppliers, products, sales, payments, and stock movements may be stored.',
+        },
+        {
+          title: 'How Data Is Used',
+          body:
+            'This data is used to manage your account, synchronize company records, maintain security, and provide support.',
+        },
+        {
+          title: 'Data Retention',
+          body:
+            'Data is retained while your account remains active. When account deletion is initiated, data that is not subject to legal or financial retention obligations is deleted or anonymized.',
+        },
+        {
+          title: 'Data Sharing',
+          body:
+            'Data is not sold. It is only shared with infrastructure and service providers required to operate the app.',
+        },
+        {
+          title: 'User Rights',
+          body:
+            'Users can update company information in the app and delete their accounts from within the app.',
+        },
+      ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <BrandHeroHeader
-        kicker="YASAL BILGILENDIRME"
-        title="Gizlilik Politikasi"
-        subtitle="Son guncelleme: 1 Nisan 2026"
+        kicker={isTr ? 'YASAL BİLGİLENDİRME' : 'LEGAL INFORMATION'}
+        title={isTr ? 'Gizlilik Politikası' : 'Privacy Policy'}
+        subtitle={isTr ? 'Son güncelleme: 1 Nisan 2026' : 'Last updated: April 1, 2026'}
       />
 
       {sections.map((section) => (
@@ -47,10 +78,11 @@ export default function PrivacyPolicyScreen() {
       ))}
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Store Hazirligi</Text>
+        <Text style={styles.noteTitle}>{isTr ? 'Store Hazırlığı' : 'Store Readiness'}</Text>
         <Text style={styles.noteText}>
-          Bu sayfa, Expo web ciktisi olarak da yayinlanip App Store ve Google Play gizlilik politikasi
-          baglantisi olarak kullanilabilir.
+          {isTr
+            ? 'Bu sayfa, Expo web çıktısı olarak da yayınlanıp App Store ve Google Play gizlilik politikası bağlantısı olarak kullanılabilir.'
+            : 'This page can also be published as an Expo web output and used as the privacy policy link for the App Store and Google Play.'}
         </Text>
       </View>
     </ScrollView>

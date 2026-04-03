@@ -26,7 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
-import { formatSignedTRY, formatTRY } from '@/lib/format';
+import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +77,7 @@ export default function Payments() {
   });
   const [showMethodPicker, setShowMethodPicker] = useState(false);
   const [showPartyPicker, setShowPartyPicker] = useState(false);
+  const [partySearch, setPartySearch] = useState('');
 
   const ensureCompany = () => {
     if (!company) {
@@ -255,6 +256,14 @@ export default function Payments() {
     [activeTab, customers, suppliers]
   );
 
+  const filteredRelatedParties = useMemo(
+    () =>
+      relatedParties.filter((party) =>
+        party.name.toLowerCase().includes(partySearch.trim().toLowerCase())
+      ),
+    [partySearch, relatedParties]
+  );
+
   const filteredPayments = useMemo(
     () => payments.filter((payment) => payment.payment_type === activeTab),
     [payments, activeTab]
@@ -313,7 +322,7 @@ export default function Payments() {
           </Text>
         ) : null}
         <Text style={[styles.itemDate, { color: theme.colors.textSoft }]}>
-          {new Date(item.payment_date).toLocaleDateString('tr-TR')}
+          {formatAppDate(item.payment_date)}
         </Text>
       </View>
 
@@ -470,7 +479,9 @@ export default function Payments() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.colors.textMuted }]}>Tutar *</Text>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+                  {t.payments.amount} *
+                </Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -517,31 +528,29 @@ export default function Payments() {
                 </TouchableOpacity>
               </View>
 
-              {relatedParties.length > 0 ? (
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>
-                    {activeTab === 'income' ? t.common.entities.customer : t.common.entities.supplier}
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>
+                  {activeTab === 'income' ? t.common.entities.customer : t.common.entities.supplier}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                    },
+                  ]}
+                  onPress={() => setShowPartyPicker(true)}
+                >
+                  <Text style={[styles.pickerValue, { color: theme.colors.text }]}>
+                    {formData.relatedPartyId
+                      ? relatedParties.find((party) => party.id === formData.relatedPartyId)?.name
+                      : activeTab === 'income'
+                        ? `${t.common.entities.customer} ${t.payments.partySelectSuffix}`
+                        : `${t.common.entities.supplier} ${t.payments.partySelectSuffix}`}
                   </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.pickerButton,
-                      {
-                        backgroundColor: theme.colors.surfaceMuted,
-                        borderColor: theme.colors.border,
-                      },
-                    ]}
-                    onPress={() => setShowPartyPicker(true)}
-                  >
-                    <Text style={[styles.pickerValue, { color: theme.colors.text }]}>
-                      {formData.relatedPartyId
-                        ? relatedParties.find(
-                            (party) => party.id === formData.relatedPartyId
-                          )?.name
-                        : t.common.selectPlaceholder}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.payments.description}</Text>
@@ -628,33 +637,57 @@ export default function Payments() {
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
-            <ScrollView>
-              <TouchableOpacity
-                style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
-                onPress={() => {
-                  setFormData({ ...formData, relatedPartyId: '' });
-                  setShowPartyPicker(false);
-                }}
-              >
-                <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
-                  {t.common.selectPlaceholder}
-                </Text>
-              </TouchableOpacity>
-              {relatedParties.map((party) => (
+            <View style={styles.searchBox}>
+              <TextInput
+                style={[
+                  styles.searchInput,
+                  {
+                    backgroundColor: theme.colors.surfaceMuted,
+                    borderColor: theme.colors.border,
+                    color: theme.colors.text,
+                  },
+                ]}
+                placeholder={t.common.search}
+                placeholderTextColor={theme.colors.textSoft}
+                value={partySearch}
+                onChangeText={setPartySearch}
+              />
+            </View>
+            <FlatList
+              data={filteredRelatedParties}
+              keyExtractor={(item) => item.id}
+              style={styles.pickerList}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.pickerListContent}
+              ListHeaderComponent={
                 <TouchableOpacity
-                  key={party.id}
                   style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                   onPress={() => {
-                    setFormData({ ...formData, relatedPartyId: party.id });
+                    setFormData({ ...formData, relatedPartyId: '' });
+                    setPartySearch('');
                     setShowPartyPicker(false);
                   }}
                 >
                   <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
-                    {party.name}
+                    {t.common.selectPlaceholder}
                   </Text>
                 </TouchableOpacity>
-              ))}
-            </ScrollView>
+              }
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
+                  onPress={() => {
+                    setFormData({ ...formData, relatedPartyId: item.id });
+                    setPartySearch('');
+                    setShowPartyPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
           </View>
         </View>
       </Modal>
@@ -915,10 +948,28 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
+    minHeight: '55%',
+  },
+  searchBox: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
   },
   pickerItem: {
     padding: 16,
     borderBottomWidth: 1,
+  },
+  pickerList: {
+    flexGrow: 0,
+  },
+  pickerListContent: {
+    paddingBottom: 20,
   },
   pickerItemText: {
     ...typography.heading,

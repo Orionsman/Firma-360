@@ -1,26 +1,39 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
-const steps = [
-  'Uygulamada oturum acin.',
-  'Ayarlar ekranina gidin.',
-  'Hesabi Kalici Olarak Sil bolumunu acin.',
-  'Isterseniz bir neden girin.',
-  'Silme islemini onaylayin.',
-];
-
 export default function AccountDeletionScreen() {
+  const isTr = t.locale() === 'tr';
+
+  const steps = isTr
+    ? [
+        'Uygulamada oturum açın.',
+        'Ayarlar ekranına gidin.',
+        'Hesabı Kalıcı Olarak Sil bölümünü açın.',
+        'İsterseniz bir neden girin.',
+        'Silme işlemini onaylayın.',
+      ]
+    : [
+        'Sign in to the app.',
+        'Go to the Settings screen.',
+        'Open the Delete Account Permanently section.',
+        'Optionally enter a reason.',
+        'Confirm the deletion action.',
+      ];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <BrandHeroHeader
-        kicker="YASAL BILGILENDIRME"
-        title="Hesap Silme"
-        subtitle="Son guncelleme: 1 Nisan 2026"
+        kicker={isTr ? 'YASAL BİLGİLENDİRME' : 'LEGAL INFORMATION'}
+        title={isTr ? 'Hesap Silme' : 'Account Deletion'}
+        subtitle={isTr ? 'Son güncelleme: 1 Nisan 2026' : 'Last updated: April 1, 2026'}
       />
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Hesap Silme Nasil Baslatilir?</Text>
+        <Text style={styles.cardTitle}>
+          {isTr ? 'Hesap Silme Nasıl Başlatılır?' : 'How to Start Account Deletion'}
+        </Text>
         {steps.map((step) => (
           <Text key={step} style={styles.stepText}>
             - {step}
@@ -29,18 +42,20 @@ export default function AccountDeletionScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Silme Sonrasi</Text>
+        <Text style={styles.cardTitle}>{isTr ? 'Silme Sonrası' : 'After Deletion'}</Text>
         <Text style={styles.cardBody}>
-          Silme islemi tamamlandiginda kullanici oturumu kapatilir. Yasal olarak saklanmasi
-          gereken kayitlar disindaki hesap ve uygulama verileri silinir veya anonimlestirilir.
+          {isTr
+            ? 'Silme işlemi tamamlandığında kullanıcı oturumu kapatılır. Yasal olarak saklanması gereken kayıtlar dışındaki hesap ve uygulama verileri silinir veya anonimleştirilir.'
+            : 'When the deletion process is completed, the user session is closed. Account and app data, except records that must be retained by law, is deleted or anonymized.'}
         </Text>
       </View>
 
       <View style={styles.noteCard}>
-        <Text style={styles.noteTitle}>Store Hazirligi</Text>
+        <Text style={styles.noteTitle}>{isTr ? 'Store Hazırlığı' : 'Store Readiness'}</Text>
         <Text style={styles.noteText}>
-          Bu sayfa Expo web ciktisi olarak yayinlanip Google Play ve App Store hesap silme
-          politikalari icin acik URL olarak kullanilabilir.
+          {isTr
+            ? 'Bu sayfa Expo web çıktısı olarak yayınlanıp Google Play ve App Store hesap silme politikaları için açık URL olarak kullanılabilir.'
+            : 'This page can be published as Expo web output and used as a public URL for Google Play and App Store account deletion policies.'}
         </Text>
       </View>
     </ScrollView>

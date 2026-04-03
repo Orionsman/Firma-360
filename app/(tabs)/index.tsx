@@ -57,6 +57,7 @@ export default function Dashboard() {
     recentAcceptedCompanies,
     dismissAcceptedCompaniesNotice,
     switchCompany,
+    noCompanyAccess,
   } = useAuth();
   const { theme, mode } = useAppTheme();
   const [stats, setStats] = useState<DashboardStats>({
@@ -186,7 +187,7 @@ export default function Dashboard() {
           title:
             getRelationName(sale.customers as RelationRecord) ||
             t.dashboard.activity.customerSale,
-          subtitle: new Date(sale.sale_date).toLocaleDateString('tr-TR'),
+          subtitle: new Date(sale.sale_date).toLocaleDateString(localeTag),
           amount: Number(sale.total_amount || 0),
           tone: 'income' as const,
           kind: 'sale' as const,
@@ -202,7 +203,7 @@ export default function Dashboard() {
                 t.dashboard.activity.payment,
           subtitle:
             payment.description ||
-            new Date(payment.payment_date).toLocaleDateString('tr-TR'),
+            new Date(payment.payment_date).toLocaleDateString(localeTag),
           amount: Number(payment.amount || 0),
           tone:
             payment.payment_type === 'income'
@@ -229,7 +230,7 @@ export default function Dashboard() {
     } finally {
       setLoadingDashboard(false);
     }
-  }, [company]);
+  }, [company, localeTag]);
 
   useEffect(() => {
     void fetchDashboard();
@@ -364,12 +365,14 @@ export default function Dashboard() {
         title: t.dashboard.pro.multiCompany.title,
         text: t.dashboard.pro.multiCompany.text,
         action: t.dashboard.pro.multiCompany.action,
+        route: '/pro-companies' as never,
       },
       {
         key: 'team-access',
         title: t.dashboard.pro.teamAccess.title,
         text: t.dashboard.pro.teamAccess.text,
         action: t.dashboard.pro.teamAccess.action,
+        route: '/pro-team' as never,
       },
     ],
     []
@@ -454,11 +457,14 @@ export default function Dashboard() {
             ]}
           >
             <Text style={[styles.inviteNoticeTitle, { color: theme.colors.text }]}>
-              Yeni firma daveti kabul edildi
+              {t.locale() === 'tr'
+                ? 'Yeni firma daveti kabul edildi'
+                : 'A new company invitation was accepted'}
             </Text>
             <Text style={[styles.inviteNoticeText, { color: theme.colors.textMuted }]}>
-              Davet edilen firmaya hemen gecebilir veya mevcut firmanla devam edip daha sonra
-              degistirebilirsin.
+              {t.locale() === 'tr'
+                ? 'Davet edilen firmaya hemen geçebilir veya mevcut firmanla devam edip daha sonra değiştirebilirsin.'
+                : 'You can switch to the invited company now or keep using your current company and switch later.'}
             </Text>
             <View style={styles.inviteNoticeActions}>
               {recentAcceptedCompanies.map((membership) => (
@@ -476,7 +482,9 @@ export default function Dashboard() {
                   <Text
                     style={[styles.inviteSwitchButtonText, { color: theme.colors.primaryStrong }]}
                   >
-                    {membership.companies?.name} firmasina gec
+                    {t.locale() === 'tr'
+                      ? `${membership.companies?.name} firmasına geç`
+                      : `Switch to ${membership.companies?.name}`}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -489,13 +497,29 @@ export default function Dashboard() {
               onPress={() => dismissAcceptedCompaniesNotice()}
             >
               <Text style={[styles.inviteDismissButtonText, { color: theme.colors.text }]}>
-                Daha sonra
+                {t.locale() === 'tr' ? 'Daha sonra' : 'Later'}
               </Text>
             </TouchableOpacity>
           </View>
         ) : null}
 
-        {!company ? (
+        {!company && noCompanyAccess ? (
+          <View
+            style={[
+              styles.setupCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <Text style={[styles.setupTitle, { color: theme.colors.text }]}>
+              {t.locale() === 'tr' ? 'Yetkiniz Olan Firma Bulunamadı' : 'No Authorized Company Found'}
+            </Text>
+            <Text style={[styles.setupText, { color: theme.colors.textMuted }]}>
+              {t.locale() === 'tr'
+                ? 'Bu hesap için aktif firma yetkisi bulunmuyor. Firma sahibi sizi tekrar eklemelidir.'
+                : 'There is no active company access for this account. The company owner must add you again.'}
+            </Text>
+          </View>
+        ) : !company ? (
           <View
             style={[
               styles.setupCard,
@@ -564,107 +588,6 @@ export default function Dashboard() {
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              {t.dashboard.pro.title}
-            </Text>
-          </View>
-          <Text style={[styles.proSectionSubtitle, { color: theme.colors.textMuted }]}>
-            {t.dashboard.pro.subtitle}
-          </Text>
-
-          <View style={styles.proGrid}>
-            {proCards.map((card) => (
-              <TouchableOpacity
-                key={card.key}
-                style={[
-                  styles.proFeatureTile,
-                  {
-                    backgroundColor: theme.colors.surfaceMuted,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                onPress={() => router.push('/business-tools' as never)}
-              >
-                <View style={styles.proTileBadge}>
-                  <Star size={11} color="#8A4B00" fill="#F6B94C" />
-                </View>
-                <Text style={[styles.proTileTitle, { color: theme.colors.text }]}>{card.title}</Text>
-                <Text style={[styles.proTileText, { color: theme.colors.textMuted }]}>{card.text}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <View
-            style={[
-              styles.proReminderSection,
-              {
-                backgroundColor: theme.colors.surfaceMuted,
-                borderColor: theme.colors.border,
-              },
-            ]}
-          >
-            <View style={styles.proReminderHeader}>
-              <View style={styles.proReminderTitleWrap}>
-                <Text style={[styles.proReminderTitle, { color: theme.colors.text }]}>
-                  {t.dashboard.pro.reminders.title}
-                </Text>
-                <Text style={[styles.proReminderText, { color: theme.colors.textMuted }]}>
-                  {t.dashboard.pro.reminders.text}
-                </Text>
-              </View>
-              <View style={styles.proReminderRight}>
-                <View style={styles.proBadge}>
-                  <Star size={12} color="#8A4B00" fill="#F6B94C" />
-                  <Text style={styles.proBadgeText}>{t.dashboard.pro.badge}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.reminderAddButton, { backgroundColor: theme.colors.primarySoft }]}
-                  onPress={() => router.push('/business-tools' as never)}
-                >
-                  <Plus size={16} color={theme.colors.primaryStrong} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {upcomingReminders.length === 0 ? (
-              <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
-                {t.dashboard.pro.reminders.empty}
-              </Text>
-            ) : (
-              upcomingReminders.map((reminder) => {
-                const customerName = Array.isArray(reminder.customers)
-                  ? reminder.customers[0]?.name
-                  : reminder.customers?.name;
-
-                return (
-                  <View
-                    key={reminder.id}
-                    style={[styles.reminderRow, { borderTopColor: theme.colors.border }]}
-                  >
-                    <View style={[styles.reminderIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
-                      <BellRing size={16} color={theme.colors.primary} />
-                    </View>
-                    <View style={styles.reminderTextWrap}>
-                      <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
-                        {reminder.title}
-                      </Text>
-                      <Text style={[styles.reminderSubtitle, { color: theme.colors.textMuted }]}>
-                        {customerName || t.dashboard.activity.collection} - {t.dashboard.pro.reminders.duePrefix}:{' '}
-                        {new Date(reminder.due_date).toLocaleDateString(localeTag)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.reminderAmount, { color: theme.colors.primaryStrong }]}>
-                      {formatTRY(Number(reminder.amount || 0))}
-                    </Text>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        </View>
-
-        <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               {t.dashboard.quickActions.title}
             </Text>
           </View>
@@ -693,6 +616,115 @@ export default function Dashboard() {
               );
             })}
           </View>
+        </View>
+
+        <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              {t.dashboard.pro.title}
+            </Text>
+          </View>
+          <Text style={[styles.proSectionSubtitle, { color: theme.colors.textMuted }]}>
+            {t.dashboard.pro.subtitle}
+          </Text>
+
+          <View style={styles.proGrid}>
+            {proCards.map((card) => (
+              <TouchableOpacity
+                key={card.key}
+                style={[
+                  styles.proFeatureTile,
+                  {
+                    backgroundColor: theme.colors.surfaceMuted,
+                    borderColor: theme.colors.border,
+                  },
+                ]}
+                onPress={() => router.push(card.route)}
+              >
+                <View style={styles.proTileBadge}>
+                  <Star size={11} color="#8A4B00" fill="#F6B94C" />
+                </View>
+                <Text style={[styles.proTileTitle, { color: theme.colors.text }]}>{card.title}</Text>
+                <Text style={[styles.proTileText, { color: theme.colors.textMuted }]}>{card.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              styles.proReminderSection,
+              {
+                backgroundColor: theme.colors.surfaceMuted,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            onPress={() => router.push('/pro-reminders' as never)}
+            activeOpacity={0.9}
+          >
+            <View style={styles.proReminderHeader}>
+              <View style={styles.proReminderTitleWrap}>
+                <Text style={[styles.proReminderTitle, { color: theme.colors.text }]}>
+                  {t.dashboard.pro.reminders.title}
+                </Text>
+                <Text style={[styles.proReminderText, { color: theme.colors.textMuted }]}>
+                  {t.dashboard.pro.reminders.text}
+                </Text>
+              </View>
+              <View style={styles.proReminderRight}>
+                <View style={styles.proBadge}>
+                  <Star size={12} color="#8A4B00" fill="#F6B94C" />
+                  <Text style={styles.proBadgeText}>{t.dashboard.pro.badge}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.reminderAddButton, { backgroundColor: theme.colors.primarySoft }]}
+                  onPress={() => router.push('/pro-reminders' as never)}
+                >
+                  <Plus size={16} color={theme.colors.primaryStrong} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {upcomingReminders.length === 0 ? (
+              <Text style={[styles.emptyState, { color: theme.colors.textSoft }]}>
+                {t.dashboard.pro.reminders.empty}
+              </Text>
+            ) : (
+              upcomingReminders.map((reminder) => {
+                const due = new Date(reminder.due_date);
+                const today = new Date();
+                const diff = Math.ceil((due.getTime() - today.setHours(0, 0, 0, 0)) / 86400000);
+
+                return (
+                  <View
+                    key={reminder.id}
+                    style={[styles.reminderRow, { borderTopColor: theme.colors.border }]}
+                  >
+                    <View style={[styles.reminderIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
+                      <BellRing size={16} color={theme.colors.primary} />
+                    </View>
+                    <View style={styles.reminderTextWrap}>
+                      <Text style={[styles.reminderTitle, { color: theme.colors.text }]}>
+                        {reminder.title}
+                      </Text>
+                      <Text style={[styles.reminderSubtitle, { color: theme.colors.textMuted }]}>
+                        {new Date(reminder.due_date).toLocaleDateString(localeTag)} -{' '}
+                        {t.locale() === 'tr'
+                          ? diff <= 0
+                            ? 'Bugün'
+                            : `${diff} gün kaldı`
+                          : diff <= 0
+                            ? 'Today'
+                            : `${diff} days left`}
+                      </Text>
+                    </View>
+                    <Text style={[styles.reminderAmount, { color: theme.colors.primaryStrong }]}>
+                      {formatTRY(Number(reminder.amount || 0))}
+                    </Text>
+                  </View>
+                );
+              })
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>

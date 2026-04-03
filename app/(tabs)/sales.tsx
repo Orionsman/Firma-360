@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,7 +19,7 @@ import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
-import { formatTRY } from '@/lib/format';
+import { formatAppDate, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -85,6 +86,8 @@ export default function Sales() {
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [saleDate, setSaleDate] = useState(
     new Date().toISOString().split('T')[0]
   );
@@ -203,6 +206,7 @@ export default function Sales() {
       ]);
     }
 
+    setProductSearch('');
     setShowProductPicker(false);
   };
 
@@ -240,8 +244,10 @@ export default function Sales() {
     );
   };
 
-  const getTotalAmount = () =>
-    saleItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const totalAmount = useMemo(
+    () => saleItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0),
+    [saleItems]
+  );
 
   const handleCreateSale = async () => {
     if (!selectedCustomer) {
@@ -278,7 +284,10 @@ export default function Sales() {
       if (data) {
         const { error: updateError } = await supabase
           .from('sales')
-          .update({ sale_date: saleDate })
+          .update({
+            sale_date: saleDate,
+            total_amount: totalAmount,
+          })
           .eq('id', data)
           .eq('company_id', company!.id);
 
@@ -369,7 +378,7 @@ export default function Sales() {
           {getRelationItem(item.customers)?.name || t.sales.noCustomer}
         </Text>
         <Text style={[styles.itemDate, { color: theme.colors.textSoft }]}>
-          {new Date(item.sale_date).toLocaleDateString('tr-TR')}
+          {formatAppDate(item.sale_date)}
         </Text>
         <Text style={[styles.itemProductNames, { color: theme.colors.textMuted }]}>
           {item.sale_items
@@ -385,8 +394,8 @@ export default function Sales() {
               const unit = product?.unit
                 ? ` ${product.unit}`
                 : '';
-              const unitPrice = Number(saleItem.unit_price || 0).toLocaleString('tr-TR');
-              const totalPrice = Number(saleItem.total_price || 0).toLocaleString('tr-TR');
+              const unitPrice = formatTRY(Number(saleItem.unit_price || 0));
+              const totalPrice = formatTRY(Number(saleItem.total_price || 0));
               return `${quantity}${unit} x ${unitPrice} = ${totalPrice}`;
             })
             .join(' | ') || t.sales.detailsEmpty}
@@ -411,6 +420,22 @@ export default function Sales() {
   const selectedCustomerName =
     customers.find((customer) => customer.id === selectedCustomer)?.name ||
     t.common.selectPlaceholder;
+
+  const filteredCustomers = useMemo(
+    () =>
+      customers.filter((customer) =>
+        customer.name.toLowerCase().includes(customerSearch.trim().toLowerCase())
+      ),
+    [customerSearch, customers]
+  );
+
+  const filteredProducts = useMemo(
+    () =>
+      products.filter((product) =>
+        product.name.toLowerCase().includes(productSearch.trim().toLowerCase())
+      ),
+    [productSearch, products]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -507,6 +532,35 @@ export default function Sales() {
                     <Text style={[styles.saleItemName, { color: theme.colors.text }]}>
                       {item.productName}
                     </Text>
+                    <View style={styles.unitPriceBlock}>
+                      <Text style={[styles.unitPriceLabel, { color: theme.colors.textMuted }]}>
+                        {t.products.salePrice}
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.unitPriceInput,
+                          {
+                            backgroundColor: theme.colors.surface,
+                            borderColor: theme.colors.border,
+                            color: theme.colors.text,
+                          },
+                        ]}
+                        value={String(item.unitPrice)}
+                        onChangeText={(value) =>
+                          setSaleItems((current) =>
+                            current.map((currentItem) =>
+                              currentItem.productId === item.productId
+                                ? {
+                                    ...currentItem,
+                                    unitPrice: Number(value.replace(',', '.')) || 0,
+                                  }
+                                : currentItem
+                            )
+                          )
+                        }
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
                     <View style={styles.quantityControls}>
                       <TouchableOpacity
                         onPress={() =>
@@ -558,8 +612,8 @@ export default function Sales() {
 
             <View style={[styles.totalSection, { backgroundColor: theme.colors.surfaceMuted }]}>
               <Text style={[styles.totalLabel, { color: theme.colors.textMuted }]}>{t.sales.total}</Text>
-              <Text style={[styles.totalAmount, { color: theme.colors.text }]}>
-                {formatTRY(getTotalAmount())}
+              <Text style={[styles.totalStaticValue, { color: theme.colors.text }]}>
+                {formatTRY(totalAmount)}
               </Text>
             </View>
           </ScrollView>
@@ -594,14 +648,34 @@ export default function Sales() {
                   <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
               </View>
+              <View style={styles.searchBox}>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
+                  placeholder={t.common.search}
+                  placeholderTextColor={theme.colors.textSoft}
+                  value={customerSearch}
+                  onChangeText={setCustomerSearch}
+                />
+              </View>
               <FlatList
-                data={customers}
+                data={filteredCustomers}
                 keyExtractor={(item) => item.id}
+                style={styles.pickerList}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.pickerListContent}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
                     onPress={() => {
                       setSelectedCustomer(item.id);
+                      setCustomerSearch('');
                       setShowCustomerPicker(false);
                     }}
                   >
@@ -627,9 +701,28 @@ export default function Sales() {
                   <X size={24} color={theme.colors.textMuted} />
                 </TouchableOpacity>
               </View>
+              <View style={styles.searchBox}>
+                <TextInput
+                  style={[
+                    styles.searchInput,
+                    {
+                      backgroundColor: theme.colors.surfaceMuted,
+                      borderColor: theme.colors.border,
+                      color: theme.colors.text,
+                    },
+                  ]}
+                  placeholder={t.common.search}
+                  placeholderTextColor={theme.colors.textSoft}
+                  value={productSearch}
+                  onChangeText={setProductSearch}
+                />
+              </View>
               <FlatList
-                data={products}
+                data={filteredProducts}
                 keyExtractor={(item) => item.id}
+                style={styles.pickerList}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.pickerListContent}
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
@@ -849,6 +942,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
+  unitPriceBlock: {
+    marginBottom: 10,
+  },
+  unitPriceLabel: {
+    ...typography.caption,
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  unitPriceInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
   quantityControls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -892,9 +1000,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   totalSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 10,
     padding: 20,
     borderRadius: 18,
     borderWidth: 1,
@@ -904,9 +1010,9 @@ const styles = StyleSheet.create({
     ...typography.heading,
     fontSize: 18,
   },
-  totalAmount: {
+  totalStaticValue: {
     ...typography.hero,
-    fontSize: 24,
+    fontSize: 22,
   },
   modalFooter: {
     padding: 24,
@@ -935,6 +1041,24 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '80%',
+    minHeight: '55%',
+  },
+  searchBox: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  pickerListContent: {
+    paddingBottom: 20,
+  },
+  pickerList: {
+    flexGrow: 0,
   },
   pickerItem: {
     flexDirection: 'row',

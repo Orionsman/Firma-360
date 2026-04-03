@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
-import { formatSignedTRY, formatTRY } from '@/lib/format';
+import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { typography } from '@/lib/typography';
 
@@ -111,7 +111,7 @@ export default function Customers() {
         const unitPrice = Number(item.unit_price || 0);
         const totalPrice = Number(item.total_price || 0);
         const unit = item.products?.unit ? ` ${item.products.unit}` : '';
-        return `${quantity}${unit} x ${unitPrice.toLocaleString('tr-TR')} = ${totalPrice.toLocaleString('tr-TR')}`;
+        return `${quantity}${unit} x ${formatTRY(unitPrice)} = ${formatTRY(totalPrice)}`;
       }).join(' | ') || t.common.entities.sale;
       return { id: `sale-${sale.id}`, title, subtitle, amount: Number(sale.total_amount), date: sale.sale_date, type: 'sale' };
     }) ?? [];
@@ -347,7 +347,7 @@ export default function Customers() {
             </View>
             <ScrollView contentContainerStyle={styles.detailList}>
               <View style={styles.filterRow}>{[{ key: 'all', label: t.customers.all }, { key: 'sale', label: t.common.entities.sales }, { key: 'payment', label: t.common.entities.payments }].map((item) => { const isActive = movementFilter === item.key; return <TouchableOpacity key={item.key} style={[styles.filterChip, { backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted, borderColor: isActive ? theme.colors.primary : theme.colors.border }]} onPress={() => setMovementFilter(item.key as 'all' | 'sale' | 'payment')}><Text style={[styles.filterChipText, { color: isActive ? theme.colors.primary : theme.colors.textMuted }]}>{item.label}</Text></TouchableOpacity>; })}</View>
-              {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {new Date(movement.date).toLocaleDateString('tr-TR')}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.type === 'payment' ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.type === 'payment' ? Math.abs(movement.amount) : -Math.abs(movement.amount))}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
+              {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.type === 'payment' ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.type === 'payment' ? Math.abs(movement.amount) : -Math.abs(movement.amount))}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
             </ScrollView>
           </View>
         </View>

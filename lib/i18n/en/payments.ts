@@ -10,6 +10,7 @@ export const enPayments = {
   emptyExpense: 'No expense yet',
   newIncome: 'New Income',
   newExpense: 'New Expense',
+  amount: 'Amount',
   noCustomer: 'No customer',
   noSupplier: 'No supplier',
   description: 'Description',
