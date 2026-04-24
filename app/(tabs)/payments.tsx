@@ -28,6 +28,8 @@ import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
 import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
+import { createLocalId, enqueueOfflineMutation } from '@/lib/offlineWriteQueue';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -67,6 +69,7 @@ export default function Payments() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [activeTab, setActiveTab] = useState<'income' | 'expense'>('income');
   const [formData, setFormData] = useState({
     amount: '',
@@ -101,11 +104,18 @@ export default function Payments() {
       .order('created_at', { ascending: false });
 
     if (error) {
+      const cached = await readOfflineCache<Payment[]>('payments-list', company.id);
+      if (cached?.data) {
+        setPayments(cached.data);
+        return;
+      }
       Alert.alert(t.common.error, error.message);
       return;
     }
 
-    setPayments((data as Payment[]) ?? []);
+    const nextPayments = (data as Payment[]) ?? [];
+    setPayments(nextPayments);
+    await writeOfflineCache('payments-list', company.id, nextPayments);
   }, [company]);
 
   const fetchCustomers = useCallback(async () => {
@@ -114,12 +124,22 @@ export default function Payments() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('customers')
       .select('id, name')
       .eq('company_id', company.id);
 
-    setCustomers(data ?? []);
+    if (error) {
+      const cached = await readOfflineCache<Customer[]>('payments-customers', company.id);
+      if (cached?.data) {
+        setCustomers(cached.data);
+      }
+      return;
+    }
+
+    const nextCustomers = data ?? [];
+    setCustomers(nextCustomers);
+    await writeOfflineCache('payments-customers', company.id, nextCustomers);
   }, [company]);
 
   const fetchSuppliers = useCallback(async () => {
@@ -128,12 +148,22 @@ export default function Payments() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('suppliers')
       .select('id, name')
       .eq('company_id', company.id);
 
-    setSuppliers(data ?? []);
+    if (error) {
+      const cached = await readOfflineCache<Supplier[]>('payments-suppliers', company.id);
+      if (cached?.data) {
+        setSuppliers(cached.data);
+      }
+      return;
+    }
+
+    const nextSuppliers = data ?? [];
+    setSuppliers(nextSuppliers);
+    await writeOfflineCache('payments-suppliers', company.id, nextSuppliers);
   }, [company]);
 
   useEffect(() => {
@@ -152,7 +182,18 @@ export default function Payments() {
     setRefreshing(false);
   };
 
-  const handleAddPayment = async () => {
+  const resetPaymentForm = () => {
+    setFormData({
+      amount: '',
+      paymentDate: new Date().toISOString().split('T')[0],
+      paymentMethod: 'cash',
+      description: '',
+      relatedPartyId: '',
+    });
+    setEditingPayment(null);
+  };
+
+  const handleSavePayment = async () => {
     if (!formData.amount.trim()) {
       Alert.alert(t.common.error, t.common.amountRequired);
       return;
@@ -168,43 +209,79 @@ export default function Payments() {
       return;
     }
 
+    const payload = {
+      company_id: company!.id,
+      customer_id:
+        activeTab === 'income' && formData.relatedPartyId
+          ? formData.relatedPartyId
+          : null,
+      supplier_id:
+        activeTab === 'expense' && formData.relatedPartyId
+          ? formData.relatedPartyId
+          : null,
+      amount: parsedAmount,
+      payment_date: formData.paymentDate,
+      payment_type: activeTab,
+      payment_method: formData.paymentMethod,
+      description: formData.description.trim() || null,
+    };
+
     setSaving(true);
     try {
-      const { error } = await supabase.from('payments').insert({
-        company_id: company!.id,
-        customer_id:
-          activeTab === 'income' && formData.relatedPartyId
-            ? formData.relatedPartyId
-            : null,
-        supplier_id:
-          activeTab === 'expense' && formData.relatedPartyId
-            ? formData.relatedPartyId
-            : null,
-        amount: parsedAmount,
-        payment_date: formData.paymentDate,
-        payment_type: activeTab,
-        payment_method: formData.paymentMethod,
-        description: formData.description.trim() || null,
-      });
+      const { error } = editingPayment
+        ? await supabase
+            .from('payments')
+            .update(payload)
+            .eq('id', editingPayment.id)
+            .eq('company_id', company!.id)
+        : await supabase.from('payments').insert(payload);
 
       if (error) {
         throw error;
       }
 
-      setFormData({
-        amount: '',
-        paymentDate: new Date().toISOString().split('T')[0],
-        paymentMethod: 'cash',
-        description: '',
-        relatedPartyId: '',
-      });
+      resetPaymentForm();
       setModalVisible(false);
       await Promise.all([fetchPayments(), fetchCustomers(), fetchSuppliers()]);
-    } catch (error: unknown) {
-      Alert.alert(
-        t.common.error,
-        error instanceof Error ? error.message : t.payments.saveFailed
-      );
+    } catch {
+      const recordId = editingPayment?.id || createLocalId();
+      const localPayment: Payment = {
+        id: recordId,
+        amount: parsedAmount,
+        payment_date: formData.paymentDate,
+        payment_type: activeTab,
+        payment_method: formData.paymentMethod,
+        description: formData.description.trim() || undefined,
+        customer_id: activeTab === 'income' ? formData.relatedPartyId || null : null,
+        supplier_id: activeTab === 'expense' ? formData.relatedPartyId || null : null,
+        customers:
+          activeTab === 'income' && formData.relatedPartyId
+            ? { name: customers.find((item) => item.id === formData.relatedPartyId)?.name || '' }
+            : null,
+        suppliers:
+          activeTab === 'expense' && formData.relatedPartyId
+            ? { name: suppliers.find((item) => item.id === formData.relatedPartyId)?.name || '' }
+            : null,
+      };
+
+      const nextPayments = editingPayment
+        ? payments.map((item) => (item.id === editingPayment.id ? localPayment : item))
+        : [localPayment, ...payments];
+
+      setPayments(nextPayments);
+      await writeOfflineCache('payments-list', company!.id, nextPayments);
+      await enqueueOfflineMutation({
+        kind: 'upsert',
+        mode: editingPayment ? 'update' : 'insert',
+        table: 'payments',
+        companyId: company!.id,
+        recordId,
+        payload,
+      });
+
+      resetPaymentForm();
+      setModalVisible(false);
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Ödeme cihazda saklandı ve daha sonra senkronlanacak.' : 'No connection. The payment was saved on this device and will sync later.');
     } finally {
       setSaving(false);
     }
@@ -228,11 +305,17 @@ export default function Payments() {
       }
 
       await Promise.all([fetchPayments(), fetchCustomers(), fetchSuppliers()]);
-    } catch (error: unknown) {
-      Alert.alert(
-        t.common.error,
-        error instanceof Error ? error.message : t.payments.deleteFailed
-      );
+    } catch {
+      const nextPayments = payments.filter((item) => item.id !== payment.id);
+      setPayments(nextPayments);
+      await writeOfflineCache('payments-list', company.id, nextPayments);
+      await enqueueOfflineMutation({
+        kind: 'delete',
+        table: 'payments',
+        companyId: company.id,
+        recordId: payment.id,
+      });
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Silme işlemi sıraya alındı.' : 'No connection. Delete was queued.');
     } finally {
       setDeletingId(null);
     }
@@ -282,8 +365,24 @@ export default function Payments() {
   const getPaymentMethodText = (method: string) =>
     t.payments.methods[method as keyof typeof t.payments.methods] || method;
 
+  const openEditPayment = (payment: Payment) => {
+    setEditingPayment(payment);
+    setActiveTab(payment.payment_type);
+    setFormData({
+      amount: String(payment.amount ?? ''),
+      paymentDate: payment.payment_date,
+      paymentMethod: payment.payment_method || 'cash',
+      description: payment.description || '',
+      relatedPartyId:
+        payment.payment_type === 'income'
+          ? payment.customer_id || ''
+          : payment.supplier_id || '',
+    });
+    setModalVisible(true);
+  };
+
   const renderPayment = ({ item }: { item: Payment }) => (
-    <View
+    <TouchableOpacity
       style={[
         styles.listItem,
         {
@@ -292,6 +391,8 @@ export default function Payments() {
           shadowColor: theme.colors.shadow,
         },
       ]}
+      activeOpacity={0.88}
+      onPress={() => openEditPayment(item)}
     >
       <View
         style={[
@@ -348,7 +449,7 @@ export default function Payments() {
           <Trash2 size={18} color="#ef4444" />
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const methodOptions = [
@@ -467,9 +568,15 @@ export default function Payments() {
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                {activeTab === 'income' ? t.payments.newIncome : t.payments.newExpense}
+                {editingPayment
+                  ? activeTab === 'income'
+                    ? (t.locale() === 'tr' ? 'Geliri Düzenle' : 'Edit Income')
+                    : (t.locale() === 'tr' ? 'Gideri Düzenle' : 'Edit Expense')
+                  : activeTab === 'income'
+                    ? t.payments.newIncome
+                    : t.payments.newExpense}
               </Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={() => { setModalVisible(false); resetPaymentForm(); }}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -581,7 +688,7 @@ export default function Payments() {
                   { backgroundColor: theme.colors.primary },
                   saving && styles.buttonDisabled,
                 ]}
-                onPress={handleAddPayment}
+                onPress={handleSavePayment}
                 disabled={saving}
               >
                 <Text style={styles.submitButtonText}>

@@ -21,6 +21,8 @@ import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { DateField } from '@/components/DateField';
 import { formatAppDate, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
+import { createLocalId, enqueueOfflineMutation } from '@/lib/offlineWriteQueue';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,6 +33,7 @@ interface Sale {
   customer_id?: string | null;
   customers?: { name?: string }[] | null;
   sale_items?: {
+    product_id?: string;
     quantity: number;
     unit_price: number;
     total_price: number;
@@ -63,6 +66,27 @@ interface SaleItem {
   unit: string;
 }
 
+const adjustProductStockLocally = (
+  currentProducts: Product[],
+  nextSaleItems: SaleItem[],
+  previousSaleItems: SaleItem[] = []
+) => {
+  const stockMap = new Map(currentProducts.map((product) => [product.id, Number(product.stock_quantity || 0)]));
+
+  previousSaleItems.forEach((item) => {
+    stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + Number(item.quantity || 0));
+  });
+
+  nextSaleItems.forEach((item) => {
+    stockMap.set(item.productId, (stockMap.get(item.productId) || 0) - Number(item.quantity || 0));
+  });
+
+  return currentProducts.map((product) => ({
+    ...product,
+    stock_quantity: stockMap.get(product.id) ?? product.stock_quantity,
+  }));
+};
+
 const interpolate = (template: string, values: Record<string, string | number>) =>
   Object.entries(values).reduce(
     (text, [key, value]) => text.replace(`{{${key}}}`, String(value)),
@@ -82,6 +106,7 @@ export default function Sales() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [saleItems, setSaleItems] = useState<SaleItem[]>([]);
   const [showProductPicker, setShowProductPicker] = useState(false);
@@ -110,17 +135,24 @@ export default function Sales() {
     const { data, error } = await supabase
       .from('sales')
       .select(
-        'id, sale_date, total_amount, customer_id, customers(name), sale_items(quantity, unit_price, total_price, products(name, unit))'
+        'id, sale_date, total_amount, customer_id, customers(name), sale_items(product_id, quantity, unit_price, total_price, products(name, unit))'
       )
       .eq('company_id', company.id)
       .order('created_at', { ascending: false });
 
     if (error) {
+      const cached = await readOfflineCache<Sale[]>('sales-list', company.id);
+      if (cached?.data) {
+        setSales(cached.data);
+        return;
+      }
       Alert.alert(t.common.error, error.message);
       return;
     }
 
-    setSales((data as unknown as Sale[]) ?? []);
+    const nextSales = (data as unknown as Sale[]) ?? [];
+    setSales(nextSales);
+    await writeOfflineCache('sales-list', company.id, nextSales);
   }, [company]);
 
   const fetchCustomers = useCallback(async () => {
@@ -129,12 +161,22 @@ export default function Sales() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('customers')
       .select('id, name')
       .eq('company_id', company.id);
 
-    setCustomers(data ?? []);
+    if (error) {
+      const cached = await readOfflineCache<Customer[]>('sales-customers', company.id);
+      if (cached?.data) {
+        setCustomers(cached.data);
+      }
+      return;
+    }
+
+    const nextCustomers = data ?? [];
+    setCustomers(nextCustomers);
+    await writeOfflineCache('sales-customers', company.id, nextCustomers);
   }, [company]);
 
   const fetchProducts = useCallback(async () => {
@@ -143,13 +185,23 @@ export default function Sales() {
       return;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .select('id, name, sale_price, stock_quantity, unit')
       .eq('company_id', company.id)
-      .gt('stock_quantity', 0);
+      ;
 
-    setProducts((data as Product[]) ?? []);
+    if (error) {
+      const cached = await readOfflineCache<Product[]>('sales-products', company.id);
+      if (cached?.data) {
+        setProducts(cached.data);
+      }
+      return;
+    }
+
+    const nextProducts = (data as Product[]) ?? [];
+    setProducts(nextProducts);
+    await writeOfflineCache('sales-products', company.id, nextProducts);
   }, [company]);
 
   useEffect(() => {
@@ -249,7 +301,14 @@ export default function Sales() {
     [saleItems]
   );
 
-  const handleCreateSale = async () => {
+  const resetSaleForm = () => {
+    setSelectedCustomer('');
+    setSaleItems([]);
+    setSaleDate(new Date().toISOString().split('T')[0]);
+    setEditingSale(null);
+  };
+
+  const handleSaveSale = async () => {
     if (!selectedCustomer) {
       Alert.alert(t.common.error, t.sales.customerRequired);
       return;
@@ -264,18 +323,27 @@ export default function Sales() {
       return;
     }
 
+    const salePayload = {
+      target_customer_id: selectedCustomer,
+      sale_items_payload: saleItems.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    };
+
     setSaving(true);
     try {
-      const saleNumber = `SAT-${Date.now()}`;
-      const { data, error } = await supabase.rpc('create_sale_with_items', {
-        target_customer_id: selectedCustomer,
-        sale_items_payload: saleItems.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-        })),
-        target_sale_number: saleNumber,
-      });
+      const { data, error } = editingSale
+        ? await supabase.rpc('update_sale_with_items', {
+            target_sale_id: editingSale.id,
+            ...salePayload,
+            target_sale_date: saleDate,
+          })
+        : await supabase.rpc('create_sale_with_items', {
+            ...salePayload,
+            target_sale_number: `SAT-${Date.now()}`,
+          });
 
       if (error) {
         throw error;
@@ -296,16 +364,66 @@ export default function Sales() {
         }
       }
 
-      setSelectedCustomer('');
-      setSaleItems([]);
-      setSaleDate(new Date().toISOString().split('T')[0]);
+      resetSaleForm();
       setModalVisible(false);
       await Promise.all([fetchSales(), fetchProducts(), fetchCustomers()]);
-    } catch (error: unknown) {
-      Alert.alert(
-        t.common.error,
-        error instanceof Error ? error.message : t.sales.createFailed
-      );
+    } catch {
+      const recordId = editingSale?.id || createLocalId();
+      const customerName = customers.find((item) => item.id === selectedCustomer)?.name || '';
+      const localSale: Sale = {
+        id: recordId,
+        sale_date: saleDate,
+        total_amount: totalAmount,
+        customer_id: selectedCustomer,
+        customers: [{ name: customerName }],
+        sale_items: saleItems.map((item) => ({
+          product_id: item.productId,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total_price: item.quantity * item.unitPrice,
+          products: [{ name: item.productName, unit: item.unit }],
+        })),
+      };
+
+      const nextSales = editingSale
+        ? sales.map((item) => (item.id === editingSale.id ? localSale : item))
+        : [localSale, ...sales];
+      setSales(nextSales);
+      await writeOfflineCache('sales-list', company!.id, nextSales);
+
+      const nextProducts = adjustProductStockLocally(products, saleItems, editingSale?.sale_items?.map((item) => ({
+        productId: item.product_id || '',
+        productName: getRelationItem(item.products)?.name || '',
+        quantity: Number(item.quantity || 0),
+        unitPrice: Number(item.unit_price || 0),
+        availableStock: 0,
+        unit: getRelationItem(item.products)?.unit || '',
+      })).filter((item) => item.productId) || []);
+      setProducts(nextProducts);
+      await writeOfflineCache('sales-products', company!.id, nextProducts);
+
+      await enqueueOfflineMutation({
+        kind: 'rpc',
+        action: 'sale_upsert',
+        mode: editingSale ? 'update' : 'insert',
+        companyId: company!.id,
+        recordId,
+        payload: {
+          customerId: selectedCustomer,
+          saleDate,
+          totalAmount,
+          targetSaleNumber: `SAT-${Date.now()}`,
+          saleItems: saleItems.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+        },
+      });
+
+      resetSaleForm();
+      setModalVisible(false);
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Satış cihazda saklandı ve sonra senkronlanacak.' : 'No connection. The sale was saved on this device and will sync later.');
     } finally {
       setSaving(false);
     }
@@ -328,11 +446,28 @@ export default function Sales() {
       }
 
       await Promise.all([fetchSales(), fetchProducts(), fetchCustomers()]);
-    } catch (error: unknown) {
-      Alert.alert(
-        t.common.error,
-        error instanceof Error ? error.message : t.sales.deleteFailed
-      );
+    } catch {
+      const nextSales = sales.filter((item) => item.id !== sale.id);
+      setSales(nextSales);
+      await writeOfflineCache('sales-list', company.id, nextSales);
+
+      const restockProducts = products.map((product) => {
+        const matched = sale.sale_items?.find((item) => item.product_id === product.id);
+        return matched
+          ? { ...product, stock_quantity: Number(product.stock_quantity || 0) + Number(matched.quantity || 0) }
+          : product;
+      });
+      setProducts(restockProducts);
+      await writeOfflineCache('sales-products', company.id, restockProducts);
+
+      await enqueueOfflineMutation({
+        kind: 'rpc',
+        action: 'sale_delete',
+        companyId: company.id,
+        recordId: sale.id,
+      });
+
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Silme işlemi sıraya alındı.' : 'No connection. Delete was queued.');
     } finally {
       setDeletingId(null);
     }
@@ -359,8 +494,32 @@ export default function Sales() {
     return Array.isArray(value) ? value[0] || null : value;
   };
 
+  const openEditSale = (sale: Sale) => {
+    const mappedItems: SaleItem[] =
+      sale.sale_items?.map((item) => {
+        const product = getRelationItem(item.products);
+        const currentProduct = products.find((entry) => entry.id === item.product_id);
+        const currentQuantity = Number(item.quantity || 0);
+
+        return {
+          productId: item.product_id || '',
+          productName: product?.name || '',
+          quantity: currentQuantity,
+          unitPrice: Number(item.unit_price || 0),
+          availableStock: Number(currentProduct?.stock_quantity || 0) + currentQuantity,
+          unit: product?.unit || currentProduct?.unit || 'adet',
+        };
+      })?.filter((item) => item.productId) || [];
+
+    setEditingSale(sale);
+    setSelectedCustomer(sale.customer_id || '');
+    setSaleDate(sale.sale_date);
+    setSaleItems(mappedItems);
+    setModalVisible(true);
+  };
+
   const renderSale = ({ item }: { item: Sale }) => (
-    <View
+    <TouchableOpacity
       style={[
         styles.listItem,
         {
@@ -369,6 +528,8 @@ export default function Sales() {
           shadowColor: theme.colors.shadow,
         },
       ]}
+      activeOpacity={0.88}
+      onPress={() => openEditSale(item)}
     >
       <View style={[styles.saleIconWrap, { backgroundColor: theme.colors.primarySoft }]}>
         <ShoppingCart size={20} color={theme.colors.primary} />
@@ -414,7 +575,7 @@ export default function Sales() {
       >
         <Trash2 size={18} color="#ef4444" />
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   const selectedCustomerName =
@@ -488,8 +649,8 @@ export default function Sales() {
       <Modal visible={modalVisible} animationType="slide">
         <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface }]}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.sales.newSale}</Text>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingSale ? (t.locale() === 'tr' ? 'Satışı Düzenle' : 'Edit Sale') : t.sales.newSale}</Text>
+            <TouchableOpacity onPress={() => { setModalVisible(false); resetSaleForm(); }}>
               <X size={24} color={theme.colors.textMuted} />
             </TouchableOpacity>
           </View>
@@ -629,13 +790,13 @@ export default function Sales() {
           >
             <TouchableOpacity
               style={[styles.createButton, { backgroundColor: theme.colors.primary }, saving && styles.buttonDisabled]}
-              onPress={handleCreateSale}
-              disabled={saving}
-            >
-              <Text style={styles.createButtonText}>
-                {saving ? t.sales.creating : t.sales.create}
-              </Text>
-            </TouchableOpacity>
+                onPress={handleSaveSale}
+                disabled={saving}
+              >
+                <Text style={styles.createButtonText}>
+                  {saving ? t.sales.creating : editingSale ? (t.locale() === 'tr' ? 'Satışı Güncelle' : 'Update Sale') : t.sales.create}
+                </Text>
+              </TouchableOpacity>
           </View>
         </View>
 

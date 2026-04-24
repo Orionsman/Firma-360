@@ -23,12 +23,16 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const { signIn } = useAuth();
+  const [showLocaleMenu, setShowLocaleMenu] = useState(false);
+  const { signIn, requestPasswordReset } = useAuth();
   const { theme } = useAppTheme();
   const { locale, setLocale } = useLocale();
 
   const handleLogin = async () => {
+    setResetMessage('');
     setErrorMessage('');
 
     if (!email || !password) {
@@ -49,6 +53,28 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    setResetMessage('');
+    setErrorMessage('');
+
+    if (!email) {
+      setErrorMessage(t.auth.reset.emailRequired);
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      await requestPasswordReset(email);
+      setResetMessage(t.auth.reset.emailSent);
+    } catch (error: unknown) {
+      setErrorMessage(
+        error instanceof Error ? error.message : t.auth.reset.emailSendFailed
+      );
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -63,6 +89,60 @@ export default function Login() {
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.localeMenuWrap}>
+          <TouchableOpacity
+            style={[
+              styles.localeTrigger,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                shadowColor: theme.colors.shadow,
+              },
+            ]}
+            onPress={() => setShowLocaleMenu((current) => !current)}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.localeTriggerText, { color: theme.colors.text }]}>
+              {locale.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+
+          {showLocaleMenu ? (
+            <View
+              style={[
+                styles.localeDropdown,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  shadowColor: theme.colors.shadow,
+                },
+              ]}
+            >
+              {(['tr', 'en'] as const)
+                .filter((option) => option !== locale)
+                .map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={styles.localeDropdownItem}
+                    onPress={() => {
+                      setLocale(option);
+                      setShowLocaleMenu(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.localeDropdownText,
+                        { color: theme.colors.text },
+                      ]}
+                    >
+                      {option.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          ) : null}
+        </View>
+
         <View
           style={[
             styles.heroCard,
@@ -82,30 +162,6 @@ export default function Login() {
               <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
                 {t.auth.appSubtitle}
               </Text>
-            </View>
-            <View style={[styles.localeSwitcher, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-              {(['tr', 'en'] as const).map((option) => {
-                const active = locale === option;
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.localeButton,
-                      active && { backgroundColor: theme.colors.primary },
-                    ]}
-                    onPress={() => setLocale(option)}
-                  >
-                    <Text
-                      style={[
-                        styles.localeButtonText,
-                        { color: active ? '#fff' : theme.colors.textMuted },
-                      ]}
-                    >
-                      {option.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
@@ -147,6 +203,22 @@ export default function Login() {
             </View>
           ) : null}
 
+          {!!resetMessage ? (
+            <View
+              style={[
+                styles.messageBox,
+                {
+                  backgroundColor: theme.colors.primarySoft,
+                  borderColor: theme.colors.success,
+                },
+              ]}
+            >
+              <Text style={[styles.messageText, { color: theme.colors.success }]}>
+                {resetMessage}
+              </Text>
+            </View>
+          ) : null}
+
           <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.fields.email}</Text>
           <TextInput
             style={[
@@ -183,6 +255,16 @@ export default function Login() {
             secureTextEntry
             autoCapitalize="none"
           />
+
+          <TouchableOpacity
+            style={styles.forgotPasswordRow}
+            onPress={handleForgotPassword}
+            disabled={resettingPassword}
+          >
+            <Text style={[styles.forgotPasswordText, { color: theme.colors.primaryStrong }]}>
+              {resettingPassword ? t.auth.reset.sending : t.auth.reset.linkLabel}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[
@@ -249,6 +331,51 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    paddingBottom: 56,
+  },
+  localeMenuWrap: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+    marginBottom: 10,
+    zIndex: 5,
+  },
+  localeTrigger: {
+    minWidth: 58,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  localeTriggerText: {
+    ...typography.label,
+    fontSize: 12,
+  },
+  localeDropdown: {
+    marginTop: 8,
+    minWidth: 66,
+    borderWidth: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  localeDropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  localeDropdownText: {
+    ...typography.label,
+    fontSize: 12,
   },
   heroCard: {
     marginTop: 30,
@@ -265,26 +392,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 16,
-  },
-  localeSwitcher: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 999,
-    padding: 4,
-    gap: 4,
-  },
-  localeButton: {
-    minWidth: 46,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  localeButtonText: {
-    ...typography.label,
-    fontSize: 12,
   },
   heroLogoShell: {
     width: 92,
@@ -376,6 +483,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
+  },
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    marginTop: 10,
+  },
+  forgotPasswordText: {
+    ...typography.label,
+    fontSize: 13,
   },
   buttonDisabled: {
     opacity: 0.6,

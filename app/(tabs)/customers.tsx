@@ -9,13 +9,15 @@ import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
 import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
+import { createLocalId, enqueueOfflineMutation } from '@/lib/offlineWriteQueue';
 import { typography } from '@/lib/typography';
 
 interface Customer { id: string; name: string; email?: string; phone?: string; address?: string; balance: number; }
 interface Supplier { id: string; name: string; email?: string; phone?: string; address?: string; balance: number; }
-interface AccountMovement { id: string; title: string; subtitle: string; amount: number; date: string; type: 'sale' | 'payment'; runningBalance?: number; }
+interface AccountMovement { id: string; title: string; subtitle: string; amount: number; date: string; type: 'sale' | 'payment'; sortKey: number; runningBalance?: number; }
 interface BalanceRow { customer_id?: string | null; supplier_id?: string | null; total_amount?: number | null; amount?: number | null; }
-interface SaleMovementRow { id: string; sale_date: string; total_amount: number; sale_items?: { quantity: number; unit_price: number; total_price: number; products?: { name?: string; unit?: string } | null; }[]; }
+interface SaleMovementRow { id: string; sale_date: string; total_amount: number; created_at?: string; sale_items?: { quantity: number; unit_price: number; total_price: number; products?: { name?: string; unit?: string } | null; }[]; }
 
 export default function Customers() {
   const { company } = useAuth();
@@ -51,14 +53,21 @@ export default function Customers() {
       supabase.from('sales').select('customer_id, total_amount').eq('company_id', company.id),
       supabase.from('payments').select('customer_id, amount').eq('company_id', company.id).eq('payment_type', 'income'),
     ]);
-    if (customersResult.error) return void Alert.alert(t.common.error, customersResult.error.message);
-    if (salesResult.error) return void Alert.alert(t.common.error, salesResult.error.message);
-    if (paymentsResult.error) return void Alert.alert(t.common.error, paymentsResult.error.message);
+    if (customersResult.error || salesResult.error || paymentsResult.error) {
+      const cached = await readOfflineCache<Customer[]>('customers-list', company.id);
+      if (cached?.data) {
+        setCustomers(cached.data);
+        return;
+      }
+      return void Alert.alert(t.common.error, customersResult.error?.message || salesResult.error?.message || paymentsResult.error?.message || t.common.error);
+    }
     const salesByCustomer = new Map<string, number>();
     const paymentsByCustomer = new Map<string, number>();
     ((salesResult.data as BalanceRow[]) ?? []).forEach((sale) => { if (sale.customer_id) salesByCustomer.set(sale.customer_id, (salesByCustomer.get(sale.customer_id) || 0) + Number(sale.total_amount || 0)); });
     ((paymentsResult.data as BalanceRow[]) ?? []).forEach((payment) => { if (payment.customer_id) paymentsByCustomer.set(payment.customer_id, (paymentsByCustomer.get(payment.customer_id) || 0) + Number(payment.amount || 0)); });
-    setCustomers(((customersResult.data as Customer[]) ?? []).map((customer) => ({ ...customer, balance: (salesByCustomer.get(customer.id) || 0) - (paymentsByCustomer.get(customer.id) || 0) })));
+    const nextCustomers = ((customersResult.data as Customer[]) ?? []).map((customer) => ({ ...customer, balance: (paymentsByCustomer.get(customer.id) || 0) - (salesByCustomer.get(customer.id) || 0) }));
+    setCustomers(nextCustomers);
+    await writeOfflineCache('customers-list', company.id, nextCustomers);
   }, [company]);
 
   const fetchSuppliers = useCallback(async () => {
@@ -67,11 +76,19 @@ export default function Customers() {
       supabase.from('suppliers').select('*').eq('company_id', company.id).order('created_at', { ascending: false }),
       supabase.from('payments').select('supplier_id, amount').eq('company_id', company.id).eq('payment_type', 'expense'),
     ]);
-    if (suppliersResult.error) return void Alert.alert(t.common.error, suppliersResult.error.message);
-    if (paymentsResult.error) return void Alert.alert(t.common.error, paymentsResult.error.message);
+    if (suppliersResult.error || paymentsResult.error) {
+      const cached = await readOfflineCache<Supplier[]>('suppliers-list', company.id);
+      if (cached?.data) {
+        setSuppliers(cached.data);
+        return;
+      }
+      return void Alert.alert(t.common.error, suppliersResult.error?.message || paymentsResult.error?.message || t.common.error);
+    }
     const paymentsBySupplier = new Map<string, number>();
     ((paymentsResult.data as BalanceRow[]) ?? []).forEach((payment) => { if (payment.supplier_id) paymentsBySupplier.set(payment.supplier_id, (paymentsBySupplier.get(payment.supplier_id) || 0) + Number(payment.amount || 0)); });
-    setSuppliers(((suppliersResult.data as Supplier[]) ?? []).map((supplier) => ({ ...supplier, balance: -(paymentsBySupplier.get(supplier.id) || 0) })));
+    const nextSuppliers = ((suppliersResult.data as Supplier[]) ?? []).map((supplier) => ({ ...supplier, balance: paymentsBySupplier.get(supplier.id) || 0 }));
+    setSuppliers(nextSuppliers);
+    await writeOfflineCache('suppliers-list', company.id, nextSuppliers);
   }, [company]);
 
   useEffect(() => { void Promise.all([fetchCustomers(), fetchSuppliers()]); }, [fetchCustomers, fetchSuppliers]);
@@ -81,16 +98,41 @@ export default function Customers() {
   const handleAdd = async () => {
     if (!formData.name.trim()) return void Alert.alert(t.common.error, t.customers.nameRequired);
     if (!ensureCompany()) return;
+    const table = activeTab === 'customers' ? 'customers' : 'suppliers';
+    const payload = { company_id: company!.id, name: formData.name.trim(), email: formData.email.trim() || null, phone: formData.phone.trim() || null, address: formData.address.trim() || null };
     setSaving(true);
     try {
-      const table = activeTab === 'customers' ? 'customers' : 'suppliers';
-      const { error } = await supabase.from(table).insert({ company_id: company!.id, name: formData.name.trim(), email: formData.email.trim() || null, phone: formData.phone.trim() || null, address: formData.address.trim() || null });
+      const { error } = await supabase.from(table).insert(payload);
       if (error) throw error;
       setFormData({ name: '', email: '', phone: '', address: '' });
       setModalVisible(false);
       await onRefresh();
-    } catch (error: unknown) {
-      Alert.alert(t.common.error, error instanceof Error ? error.message : t.customers.addFailed);
+    } catch {
+      const localId = createLocalId();
+      const localRecord = { id: localId, ...payload, balance: 0 };
+
+      if (activeTab === 'customers') {
+        const nextCustomers = [localRecord as Customer, ...customers];
+        setCustomers(nextCustomers);
+        await writeOfflineCache('customers-list', company!.id, nextCustomers);
+      } else {
+        const nextSuppliers = [localRecord as Supplier, ...suppliers];
+        setSuppliers(nextSuppliers);
+        await writeOfflineCache('suppliers-list', company!.id, nextSuppliers);
+      }
+
+      await enqueueOfflineMutation({
+        kind: 'upsert',
+        mode: 'insert',
+        table: activeTab === 'customers' ? 'customers' : 'suppliers',
+        companyId: company!.id,
+        recordId: localId,
+        payload,
+      });
+
+      setFormData({ name: '', email: '', phone: '', address: '' });
+      setModalVisible(false);
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Kayıt cihaza alındı ve internet gelince senkronlanacak.' : 'No connection. The record was saved on this device and will sync when online.');
     } finally {
       setSaving(false);
     }
@@ -98,11 +140,16 @@ export default function Customers() {
 
   const fetchCustomerMovements = async (customerId: string) => {
     const [salesResult, paymentsResult] = await Promise.all([
-      supabase.from('sales').select('id, sale_date, total_amount, sale_items(quantity, unit_price, total_price, products(name, unit))').eq('customer_id', customerId).order('sale_date', { ascending: false }),
-      supabase.from('payments').select('id, amount, payment_date, payment_method, payment_type').eq('customer_id', customerId).eq('payment_type', 'income').order('payment_date', { ascending: false }),
+      supabase.from('sales').select('id, sale_date, total_amount, created_at, sale_items(quantity, unit_price, total_price, products(name, unit))').eq('customer_id', customerId).order('created_at', { ascending: false }),
+      supabase.from('payments').select('id, amount, payment_date, payment_method, payment_type, created_at').eq('customer_id', customerId).eq('payment_type', 'income').order('created_at', { ascending: false }),
     ]);
-    if (salesResult.error) throw salesResult.error;
-    if (paymentsResult.error) throw paymentsResult.error;
+    if (salesResult.error || paymentsResult.error) {
+      const cached = await readOfflineCache<AccountMovement[]>(`customer-movements:${customerId}`, company?.id);
+      if (cached?.data) {
+        return cached.data;
+      }
+      throw salesResult.error || paymentsResult.error;
+    }
     const saleMovements: AccountMovement[] = (salesResult.data as SaleMovementRow[] | null)?.map((sale) => {
       const saleItems = sale.sale_items ?? [];
       const title = saleItems.map((item) => item.products?.name).filter(Boolean).join(', ') || t.common.entities.sale;
@@ -113,20 +160,30 @@ export default function Customers() {
         const unit = item.products?.unit ? ` ${item.products.unit}` : '';
         return `${quantity}${unit} x ${formatTRY(unitPrice)} = ${formatTRY(totalPrice)}`;
       }).join(' | ') || t.common.entities.sale;
-      return { id: `sale-${sale.id}`, title, subtitle, amount: Number(sale.total_amount), date: sale.sale_date, type: 'sale' };
+      return { id: `sale-${sale.id}`, title, subtitle, amount: -Number(sale.total_amount), date: sale.sale_date, type: 'sale', sortKey: new Date(sale.created_at || sale.sale_date).getTime() };
     }) ?? [];
-    const paymentMovements: AccountMovement[] = paymentsResult.data?.map((payment) => ({ id: `payment-${payment.id}`, title: t.common.entities.payment, subtitle: payment.payment_method, amount: -Number(payment.amount), date: payment.payment_date, type: 'payment' })) ?? [];
-    const ordered = [...saleMovements, ...paymentMovements].sort((a, b) => a.date.localeCompare(b.date));
+    const paymentMovements: AccountMovement[] = paymentsResult.data?.map((payment) => ({ id: `payment-${payment.id}`, title: t.common.entities.payment, subtitle: payment.payment_method, amount: Number(payment.amount), date: payment.payment_date, type: 'payment', sortKey: new Date(payment.created_at || payment.payment_date).getTime() })) ?? [];
+    const ordered = [...saleMovements, ...paymentMovements].sort((a, b) => a.sortKey - b.sortKey);
     let runningBalance = 0;
-    return ordered.map((movement) => ({ ...movement, runningBalance: (runningBalance += movement.amount) })).sort((a, b) => b.date.localeCompare(a.date));
+    const nextMovements = ordered.map((movement) => ({ ...movement, runningBalance: (runningBalance += movement.amount) })).sort((a, b) => b.sortKey - a.sortKey);
+    await writeOfflineCache(`customer-movements:${customerId}`, company?.id, nextMovements);
+    return nextMovements;
   };
 
   const fetchSupplierMovements = async (supplierId: string) => {
-    const { data, error } = await supabase.from('payments').select('id, amount, payment_date, payment_method').eq('supplier_id', supplierId).eq('payment_type', 'expense').order('payment_date', { ascending: false });
-    if (error) throw error;
-    const ordered = data?.map((payment) => ({ id: `payment-${payment.id}`, title: t.common.entities.payment, subtitle: payment.payment_method, amount: -Number(payment.amount), date: payment.payment_date, type: 'payment' as const })) ?? [];
+    const { data, error } = await supabase.from('payments').select('id, amount, payment_date, payment_method, created_at').eq('supplier_id', supplierId).eq('payment_type', 'expense').order('created_at', { ascending: false });
+    if (error) {
+      const cached = await readOfflineCache<AccountMovement[]>(`supplier-movements:${supplierId}`, company?.id);
+      if (cached?.data) {
+        return cached.data;
+      }
+      throw error;
+    }
+    const ordered = data?.map((payment) => ({ id: `payment-${payment.id}`, title: t.common.entities.payment, subtitle: payment.payment_method, amount: Number(payment.amount), date: payment.payment_date, type: 'payment' as const, sortKey: new Date(payment.created_at || payment.payment_date).getTime() })) ?? [];
     let runningBalance = 0;
-    return ordered.sort((a, b) => a.date.localeCompare(b.date)).map((movement) => ({ ...movement, runningBalance: (runningBalance += movement.amount) })).sort((a, b) => b.date.localeCompare(a.date));
+    const nextMovements = ordered.sort((a, b) => a.sortKey - b.sortKey).map((movement) => ({ ...movement, runningBalance: (runningBalance += movement.amount) })).sort((a, b) => b.sortKey - a.sortKey);
+    await writeOfflineCache(`supplier-movements:${supplierId}`, company?.id, nextMovements);
+    return nextMovements;
   };
 
   const openDetails = async (record: Customer | Supplier) => {
@@ -169,8 +226,25 @@ export default function Customers() {
       const { error } = await supabase.from(table).delete().eq('id', record.id).eq('company_id', company.id);
       if (error) throw error;
       await onRefresh();
-    } catch (error: unknown) {
-      Alert.alert(t.common.error, error instanceof Error ? error.message : t.customers.deleteFailed);
+    } catch {
+      if (isCustomer) {
+        const nextCustomers = customers.filter((item) => item.id !== record.id);
+        setCustomers(nextCustomers);
+        await writeOfflineCache('customers-list', company.id, nextCustomers);
+      } else {
+        const nextSuppliers = suppliers.filter((item) => item.id !== record.id);
+        setSuppliers(nextSuppliers);
+        await writeOfflineCache('suppliers-list', company.id, nextSuppliers);
+      }
+
+      await enqueueOfflineMutation({
+        kind: 'delete',
+        table: isCustomer ? 'customers' : 'suppliers',
+        companyId: company.id,
+        recordId: record.id,
+      });
+
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Bağlantı yok. Silme işlemi sıraya alındı.' : 'No connection. Delete was queued.');
     } finally {
       setDeletingId(null);
     }
@@ -182,7 +256,7 @@ export default function Customers() {
       <View style={styles.itemBalance}>
         {numericBalance !== 0 ? numericBalance > 0 ? <TrendingUp size={18} color="#22c55e" /> : <TrendingDown size={18} color="#ef4444" /> : null}
         <Text style={[styles.balanceText, { color: theme.colors.textMuted }, numericBalance > 0 && styles.balancePositive, numericBalance < 0 && styles.balanceNegative]}>
-          {formatTRY(Math.abs(numericBalance))}
+          {formatSignedTRY(numericBalance)}
         </Text>
       </View>
     );
@@ -342,12 +416,12 @@ export default function Customers() {
         <View style={styles.modalOverlay}>
           <View style={[styles.detailContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <View><Text style={[styles.modalTitle, { color: theme.colors.text }]}>{selectedRecord?.name}</Text><Text style={[styles.detailBalance, { color: theme.colors.textMuted }]}>{t.common.entities.balance}: {formatTRY(Math.abs(Number(selectedRecord?.balance || 0)))}</Text></View>
+              <View><Text style={[styles.modalTitle, { color: theme.colors.text }]}>{selectedRecord?.name}</Text><Text style={[styles.detailBalance, { color: theme.colors.textMuted }]}>{t.common.entities.balance}: {formatSignedTRY(Number(selectedRecord?.balance || 0))}</Text></View>
               <TouchableOpacity onPress={() => setDetailVisible(false)}><X size={24} color={theme.colors.textMuted} /></TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={styles.detailList}>
               <View style={styles.filterRow}>{[{ key: 'all', label: t.customers.all }, { key: 'sale', label: t.common.entities.sales }, { key: 'payment', label: t.common.entities.payments }].map((item) => { const isActive = movementFilter === item.key; return <TouchableOpacity key={item.key} style={[styles.filterChip, { backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted, borderColor: isActive ? theme.colors.primary : theme.colors.border }]} onPress={() => setMovementFilter(item.key as 'all' | 'sale' | 'payment')}><Text style={[styles.filterChipText, { color: isActive ? theme.colors.primary : theme.colors.textMuted }]}>{item.label}</Text></TouchableOpacity>; })}</View>
-              {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.type === 'payment' ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.type === 'payment' ? Math.abs(movement.amount) : -Math.abs(movement.amount))}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
+              {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.amount >= 0 ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.amount)}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
             </ScrollView>
           </View>
         </View>

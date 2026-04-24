@@ -26,6 +26,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showLocaleMenu, setShowLocaleMenu] = useState(false);
   const { signUp } = useAuth();
   const { theme } = useAppTheme();
   const { locale, setLocale } = useLocale();
@@ -80,6 +81,60 @@ export default function Register() {
       </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.localeMenuWrap}>
+          <TouchableOpacity
+            style={[
+              styles.localeTrigger,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+                shadowColor: theme.colors.shadow,
+              },
+            ]}
+            onPress={() => setShowLocaleMenu((current) => !current)}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.localeTriggerText, { color: theme.colors.text }]}>
+              {locale.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+
+          {showLocaleMenu ? (
+            <View
+              style={[
+                styles.localeDropdown,
+                {
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                  shadowColor: theme.colors.shadow,
+                },
+              ]}
+            >
+              {(['tr', 'en'] as const)
+                .filter((option) => option !== locale)
+                .map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={styles.localeDropdownItem}
+                    onPress={() => {
+                      setLocale(option);
+                      setShowLocaleMenu(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.localeDropdownText,
+                        { color: theme.colors.text },
+                      ]}
+                    >
+                      {option.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          ) : null}
+        </View>
+
         <View
           style={[
             styles.heroCard,
@@ -99,30 +154,6 @@ export default function Register() {
               <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>
                 {t.auth.register.heroSubtitle}
               </Text>
-            </View>
-            <View style={[styles.localeSwitcher, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
-              {(['tr', 'en'] as const).map((option) => {
-                const active = locale === option;
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.localeButton,
-                      active && { backgroundColor: theme.colors.primary },
-                    ]}
-                    onPress={() => setLocale(option)}
-                  >
-                    <Text
-                      style={[
-                        styles.localeButtonText,
-                        { color: active ? '#fff' : theme.colors.textMuted },
-                      ]}
-                    >
-                      {option.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
             </View>
           </View>
           <View style={[styles.badge, { backgroundColor: theme.colors.primarySoft }]}>
@@ -296,6 +327,51 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    paddingBottom: 56,
+  },
+  localeMenuWrap: {
+    alignItems: 'flex-end',
+    marginTop: 8,
+    marginBottom: 10,
+    zIndex: 5,
+  },
+  localeTrigger: {
+    minWidth: 58,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  localeTriggerText: {
+    ...typography.label,
+    fontSize: 12,
+  },
+  localeDropdown: {
+    marginTop: 8,
+    minWidth: 66,
+    borderWidth: 1,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 4,
+  },
+  localeDropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  localeDropdownText: {
+    ...typography.label,
+    fontSize: 12,
   },
   heroCard: {
     marginTop: 28,
@@ -312,26 +388,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-  },
-  localeSwitcher: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 999,
-    padding: 4,
-    gap: 4,
-  },
-  localeButton: {
-    minWidth: 46,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  localeButtonText: {
-    ...typography.label,
-    fontSize: 12,
   },
   heroLogoShell: {
     width: 86,

@@ -3,11 +3,15 @@ import React, {
   ReactNode,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
+import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import { t } from '@/lib/i18n';
+import { flushOfflineMutations } from '@/lib/offlineWriteQueue';
 import { supabase } from '@/lib/supabase';
 
 interface Company {
@@ -46,6 +50,8 @@ interface AuthContextType {
   noCompanyAccess: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   signUp: (
     email: string,
     password: string,
@@ -66,6 +72,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const ACTIVE_COMPANY_STORAGE_KEY = 'cepte_cari_active_company_id';
+
+const getAuthParamsFromUrl = (url: string) => {
+  const [baseWithQuery, hash = ''] = url.split('#');
+  const queryString = baseWithQuery.includes('?')
+    ? baseWithQuery.split('?')[1]
+    : '';
+  const searchParams = new URLSearchParams(
+    [queryString, hash].filter(Boolean).join('&')
+  );
+
+  return {
+    accessToken: searchParams.get('access_token'),
+    refreshToken: searchParams.get('refresh_token'),
+    type: searchParams.get('type'),
+    code: searchParams.get('code'),
+  };
+};
 
 const getReadableAuthError = (error: unknown) => {
   const isTr = t.locale() === 'tr';
@@ -137,6 +160,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [recentAcceptedCompanies, setRecentAcceptedCompanies] = useState<CompanyMembership[]>([]);
   const [noCompanyAccess, setNoCompanyAccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const flushInFlightRef = useRef(false);
+
+  const flushQueuedWrites = async () => {
+    if (flushInFlightRef.current) {
+      return;
+    }
+
+    flushInFlightRef.current = true;
+    try {
+      await flushOfflineMutations();
+    } finally {
+      flushInFlightRef.current = false;
+    }
+  };
 
   const syncUserContext = async (nextUser: User | null) => {
     setUser(nextUser);
@@ -151,6 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await AsyncStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
       return;
     }
+
+    await flushQueuedWrites();
 
     await supabase.rpc('upsert_current_user_profile', {
       profile_full_name: nextUser.user_metadata?.full_name ?? null,
@@ -252,12 +291,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const handleIncomingUrl = async (url: string | null) => {
+      if (!url || !url.includes('reset-password')) {
+        return;
+      }
+
+      const { accessToken, refreshToken, code } = getAuthParamsFromUrl(url);
+
+      try {
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          return;
+        }
+
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+        }
+      } catch {
+        // Reset password screen will surface invalid-link feedback when needed.
+      }
+    };
+
+    void Linking.getInitialURL().then(handleIncomingUrl);
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      void handleIncomingUrl(url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    void flushQueuedWrites();
+
+    const interval = setInterval(() => {
+      void flushQueuedWrites();
+    }, 45000);
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void flushQueuedWrites();
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [user]);
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    const redirectTo = Linking.createURL('reset-password');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      throw new Error(getReadableAuthError(error));
+    }
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
     if (error) {
       throw new Error(getReadableAuthError(error));
     }
@@ -512,6 +628,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         noCompanyAccess,
         loading,
         signIn,
+        requestPasswordReset,
+        updatePassword,
         signUp,
         createCompanyProfile,
         createAdditionalCompany,

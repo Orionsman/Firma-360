@@ -1,0 +1,59 @@
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+Networking has been disabled
+Starting project at C:\Users\Win10\Desktop\Firma 360\Firma-360
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 40.5% (28/44)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.6% (160/299)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.0% (345/506)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.6% (644/795)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.6% ( 956/2512)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.6% (1661/2512)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.6% (2545/2589)
+Web Bundled 26632ms node_modules\expo-router\entry.js (2719 modules)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\jspdf\dist\jspdf.es.min.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 1452ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\jspdf\dist\jspdf.es.min.js ░░░░░░░░░░░░░░░░  1.0% (1/1)
+Web Bundled 4651ms node_modules\jspdf\dist\jspdf.es.min.js (27 modules)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 189ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 11ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 3ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 115ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 8ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 3ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 108ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 117ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 94ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 101ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 7ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 2ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 98ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 8ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 2ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 94ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 3ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web Bundled 6ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 107ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web Bundled 8ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 4ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+
+C:\Users\Win10\Desktop\Firma 360\Firma-360>

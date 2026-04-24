@@ -14,10 +14,10 @@ export const CURRENCY_OPTIONS: Array<{
 ];
 
 const CURRENCY_SYMBOLS: Record<SupportedCurrency, string> = {
-  TRY: '₺',
+  TRY: '\u20BA',
   USD: '$',
-  EUR: '€',
-  GBP: '£',
+  EUR: '\u20AC',
+  GBP: '\u00A3',
 };
 
 export function setFormattingLocale(locale: string) {

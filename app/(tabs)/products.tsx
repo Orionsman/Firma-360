@@ -12,13 +12,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Plus, X, Package, TriangleAlert as AlertTriangle, Trash2 } from 'lucide-react-native';
+import { Plus, X, Package, TriangleAlert as AlertTriangle, Trash2, Truck } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { DateField } from '@/components/DateField';
 import { formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
+import { createLocalId, enqueueOfflineMutation } from '@/lib/offlineWriteQueue';
 import { typography } from '@/lib/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,17 +36,29 @@ interface Product {
   min_stock_level: number;
 }
 
+interface Supplier {
+  id: string;
+  name: string;
+}
+
 export default function Products() {
   const { company } = useAuth();
   const { theme } = useAppTheme();
+  const isTr = t.locale() === 'tr';
   const insets = useSafeAreaInsets();
   const modalBottomSpacing =
     Math.max(insets.bottom, Platform.OS === 'android' ? 34 : 20) + 24;
   const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [purchaseSaving, setPurchaseSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showSupplierPicker, setShowSupplierPicker] = useState(false);
+  const [showProductPicker, setShowProductPicker] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
@@ -52,6 +67,15 @@ export default function Products() {
     purchasePrice: '',
     stockQuantity: '',
     minStockLevel: '',
+  });
+  const [purchaseData, setPurchaseData] = useState({
+    supplierId: '',
+    productId: '',
+    quantity: '',
+    unitPrice: '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMethod: 'cash',
+    description: '',
   });
 
   const ensureCompany = () => {
@@ -76,24 +100,69 @@ export default function Products() {
       .order('created_at', { ascending: false });
 
     if (error) {
+      const cached = await readOfflineCache<Product[]>('products-list', company.id);
+      if (cached?.data) {
+        setProducts(cached.data);
+        return;
+      }
       Alert.alert(t.common.error, error.message);
       return;
     }
 
-    setProducts(data ?? []);
+    const nextProducts = data ?? [];
+    setProducts(nextProducts);
+    await writeOfflineCache('products-list', company.id, nextProducts);
+  }, [company]);
+
+  const fetchSuppliers = useCallback(async () => {
+    if (!company) {
+      setSuppliers([]);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('id, name')
+      .eq('company_id', company.id)
+      .order('name', { ascending: true });
+
+    if (error) {
+      const cached = await readOfflineCache<Supplier[]>('product-suppliers', company.id);
+      if (cached?.data) {
+        setSuppliers(cached.data);
+      }
+      return;
+    }
+
+    const nextSuppliers = (data as Supplier[]) ?? [];
+    setSuppliers(nextSuppliers);
+    await writeOfflineCache('product-suppliers', company.id, nextSuppliers);
   }, [company]);
 
   useEffect(() => {
-    void fetchProducts();
-  }, [fetchProducts]);
+    void Promise.all([fetchProducts(), fetchSuppliers()]);
+  }, [fetchProducts, fetchSuppliers]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchProducts();
+    await Promise.all([fetchProducts(), fetchSuppliers()]);
     setRefreshing(false);
   };
 
-  const handleAdd = async () => {
+  const resetProductForm = () => {
+    setFormData({
+      name: '',
+      code: '',
+      unit: 'adet',
+      salePrice: '',
+      purchasePrice: '',
+      stockQuantity: '',
+      minStockLevel: '',
+    });
+    setEditingProduct(null);
+  };
+
+  const handleSaveProduct = async () => {
     if (!formData.name.trim()) {
       Alert.alert(t.common.error, t.products.nameRequired);
       return;
@@ -103,41 +172,231 @@ export default function Products() {
       return;
     }
 
+    const payload = {
+      company_id: company!.id,
+      name: formData.name.trim(),
+      code: formData.code.trim() || null,
+      unit: formData.unit.trim() || 'adet',
+      sale_price: parseFloat(formData.salePrice) || 0,
+      purchase_price: parseFloat(formData.purchasePrice) || 0,
+      stock_quantity: parseFloat(formData.stockQuantity) || 0,
+      min_stock_level: parseFloat(formData.minStockLevel) || 0,
+    };
+
     setSaving(true);
     try {
-      const { error } = await supabase.from('products').insert({
-        company_id: company!.id,
+      const { error } = editingProduct
+        ? await supabase
+            .from('products')
+            .update(payload)
+            .eq('id', editingProduct.id)
+            .eq('company_id', company!.id)
+        : await supabase.from('products').insert(payload);
+
+      if (error) {
+        throw error;
+      }
+
+      resetProductForm();
+      setModalVisible(false);
+      await fetchProducts();
+    } catch {
+      const recordId = editingProduct?.id || createLocalId();
+      const localProduct: Product = {
+        id: recordId,
         name: formData.name.trim(),
-        code: formData.code.trim() || null,
+        code: formData.code.trim() || undefined,
         unit: formData.unit.trim() || 'adet',
         sale_price: parseFloat(formData.salePrice) || 0,
         purchase_price: parseFloat(formData.purchasePrice) || 0,
         stock_quantity: parseFloat(formData.stockQuantity) || 0,
         min_stock_level: parseFloat(formData.minStockLevel) || 0,
+      };
+      const nextProducts = editingProduct
+        ? products.map((item) => (item.id === editingProduct.id ? localProduct : item))
+        : [localProduct, ...products];
+      setProducts(nextProducts);
+      await writeOfflineCache('products-list', company!.id, nextProducts);
+      await enqueueOfflineMutation({
+        kind: 'upsert',
+        mode: editingProduct ? 'update' : 'insert',
+        table: 'products',
+        companyId: company!.id,
+        recordId,
+        payload,
+      });
+
+      resetProductForm();
+      setModalVisible(false);
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'BaÄŸlantÄ± yok. ÃœrÃ¼n cihazda saklandÄ± ve sonra senkronlanacak.' : 'No connection. The product was saved on this device and will sync later.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setFormData({
+      name: product.name || '',
+      code: product.code || '',
+      unit: product.unit || 'adet',
+      salePrice: String(product.sale_price ?? ''),
+      purchasePrice: String(product.purchase_price ?? ''),
+      stockQuantity: String(product.stock_quantity ?? ''),
+      minStockLevel: String(product.min_stock_level ?? ''),
+    });
+    setModalVisible(true);
+  };
+
+  const selectedPurchaseSupplierName =
+    suppliers.find((supplier) => supplier.id === purchaseData.supplierId)?.name ||
+    t.common.selectPlaceholder;
+  const selectedPurchaseProductName =
+    products.find((product) => product.id === purchaseData.productId)?.name ||
+    t.common.selectPlaceholder;
+
+  const methodOptions = [
+    { value: 'cash', label: isTr ? 'Nakit' : 'Cash' },
+    { value: 'bank_transfer', label: isTr ? 'Banka transferi' : 'Bank transfer' },
+    { value: 'credit_card', label: isTr ? 'Kredi kartÄ±' : 'Credit card' },
+    { value: 'check', label: isTr ? 'Ã‡ek' : 'Check' },
+  ];
+
+  const selectedPurchaseMethod =
+    methodOptions.find((method) => method.value === purchaseData.paymentMethod)?.label ||
+    methodOptions[0].label;
+
+  const handleCreatePurchase = async () => {
+    if (!purchaseData.supplierId || !purchaseData.productId) {
+      Alert.alert(
+        t.common.error,
+        isTr ? 'Tedarikçi ve ürün seçin.' : 'Select a supplier and product.'
+      );
+      return;
+    }
+
+    const quantity = parseFloat(purchaseData.quantity);
+    const unitPrice = parseFloat(purchaseData.unitPrice);
+
+    if (
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(unitPrice) ||
+      unitPrice < 0
+    ) {
+      Alert.alert(
+        t.common.error,
+        isTr
+          ? 'Geçerli miktar ve alış fiyatı girin.'
+          : 'Enter a valid quantity and purchase price.'
+      );
+      return;
+    }
+
+    setPurchaseSaving(true);
+    try {
+      const { error } = await supabase.rpc('create_supplier_purchase', {
+        target_supplier_id: purchaseData.supplierId,
+        target_product_id: purchaseData.productId,
+        target_quantity: quantity,
+        target_unit_price: unitPrice,
+        target_payment_date: purchaseData.paymentDate,
+        target_payment_method: purchaseData.paymentMethod,
+        target_description: purchaseData.description.trim() || null,
       });
 
       if (error) {
         throw error;
       }
 
-      setFormData({
-        name: '',
-        code: '',
-        unit: 'adet',
-        salePrice: '',
-        purchasePrice: '',
-        stockQuantity: '',
-        minStockLevel: '',
+      setPurchaseData({
+        supplierId: '',
+        productId: '',
+        quantity: '',
+        unitPrice: '',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentMethod: 'cash',
+        description: '',
       });
-      setModalVisible(false);
-      await fetchProducts();
-    } catch (error: unknown) {
+      setPurchaseModalVisible(false);
+      await Promise.all([fetchProducts(), fetchSuppliers()]);
+    } catch {
+      const selectedProduct = products.find(
+        (product) => product.id === purchaseData.productId
+      );
+      const selectedSupplier = suppliers.find(
+        (supplier) => supplier.id === purchaseData.supplierId
+      );
+      const amount = quantity * unitPrice;
+
+      const nextProducts = products.map((product) =>
+        product.id === purchaseData.productId
+          ? {
+              ...product,
+              stock_quantity: Number(product.stock_quantity || 0) + quantity,
+              purchase_price: unitPrice,
+            }
+          : product
+      );
+      setProducts(nextProducts);
+      await writeOfflineCache('products-list', company!.id, nextProducts);
+
+      const cachedPayments =
+        await readOfflineCache<Record<string, unknown>[]>(
+          'payments-list',
+          company!.id
+        );
+      const nextPayments = [
+        {
+          id: createLocalId(),
+          amount,
+          payment_date: purchaseData.paymentDate,
+          payment_type: 'expense',
+          payment_method: purchaseData.paymentMethod,
+          description:
+            purchaseData.description.trim() ||
+            `${selectedProduct?.name || t.common.entities.product} alim kaydi`,
+          supplier_id: purchaseData.supplierId,
+          suppliers: { name: selectedSupplier?.name || '' },
+        },
+        ...((cachedPayments?.data as Record<string, unknown>[]) || []),
+      ];
+      await writeOfflineCache('payments-list', company!.id, nextPayments);
+
+      await enqueueOfflineMutation({
+        kind: 'rpc',
+        action: 'supplier_purchase',
+        companyId: company!.id,
+        recordId: createLocalId(),
+        payload: {
+          supplierId: purchaseData.supplierId,
+          productId: purchaseData.productId,
+          quantity,
+          unitPrice,
+          paymentDate: purchaseData.paymentDate,
+          paymentMethod: purchaseData.paymentMethod,
+          description: purchaseData.description.trim() || null,
+        },
+      });
+
+      setPurchaseData({
+        supplierId: '',
+        productId: '',
+        quantity: '',
+        unitPrice: '',
+        paymentDate: new Date().toISOString().split('T')[0],
+        paymentMethod: 'cash',
+        description: '',
+      });
+      setPurchaseModalVisible(false);
       Alert.alert(
         t.common.error,
-        error instanceof Error ? error.message : t.products.saveFailed
+        isTr
+          ? 'Bağlantı yok. Mal alımı cihazda saklandı ve sonra senkronlanacak.'
+          : 'No connection. The purchase was saved on this device and will sync later.'
       );
     } finally {
-      setSaving(false);
+      setPurchaseSaving(false);
     }
   };
 
@@ -159,11 +418,17 @@ export default function Products() {
       }
 
       await fetchProducts();
-    } catch (error: unknown) {
-      Alert.alert(
-        t.common.error,
-        error instanceof Error ? error.message : t.products.deleteFailed
-      );
+    } catch {
+      const nextProducts = products.filter((item) => item.id !== product.id);
+      setProducts(nextProducts);
+      await writeOfflineCache('products-list', company.id, nextProducts);
+      await enqueueOfflineMutation({
+        kind: 'delete',
+        table: 'products',
+        companyId: company.id,
+        recordId: product.id,
+      });
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'BaÄŸlantÄ± yok. Silme iÅŸlemi sÄ±raya alÄ±ndÄ±.' : 'No connection. Delete was queued.');
     } finally {
       setDeletingId(null);
     }
@@ -186,11 +451,13 @@ export default function Products() {
     const isLowStock = item.stock_quantity <= item.min_stock_level;
 
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.listItem,
           { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
         ]}
+        activeOpacity={0.86}
+        onPress={() => openEditProduct(item)}
       >
         <View
           style={[
@@ -234,7 +501,7 @@ export default function Products() {
           <Trash2 size={18} color="#ef4444" />
           <Text style={styles.deleteText}>{t.common.delete}</Text>
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -244,22 +511,36 @@ export default function Products() {
         kicker={t.products.kicker}
         brandSubtitle={t.products.heroSubtitle}
         rightAccessory={
-          <TouchableOpacity
-            onPress={() => {
-              if (!ensureCompany()) {
-                return;
-              }
-              setModalVisible(true);
-            }}
-            style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-          >
-            <View style={styles.addProductIcon}>
-              <Package size={20} color="#ffffff" />
-              <View style={styles.addBadge}>
-                <Plus size={12} color={theme.colors.primary} />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => {
+                if (!ensureCompany()) {
+                  return;
+                }
+                setPurchaseModalVisible(true);
+              }}
+              style={[styles.secondaryHeaderButton, { backgroundColor: theme.colors.surface }]}
+            >
+              <Truck size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => {
+                if (!ensureCompany()) {
+                  return;
+                }
+                resetProductForm();
+                setModalVisible(true);
+              }}
+              style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+            >
+              <View style={styles.addProductIcon}>
+                <Package size={20} color="#ffffff" />
+                <View style={styles.addBadge}>
+                  <Plus size={12} color={theme.colors.primary} />
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         }
       />
 
@@ -283,8 +564,8 @@ export default function Products() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.products.newProduct}</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingProduct ? (isTr ? 'ÃœrÃ¼nÃ¼ DÃ¼zenle' : 'Edit Product') : t.products.newProduct}</Text>
+              <TouchableOpacity onPress={() => { setModalVisible(false); resetProductForm(); }}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
             </View>
@@ -439,7 +720,7 @@ export default function Products() {
                   { backgroundColor: theme.colors.primary },
                   saving && styles.buttonDisabled,
                 ]}
-                onPress={handleAdd}
+                onPress={handleSaveProduct}
                 disabled={saving}
               >
                 <Text style={styles.submitButtonText}>
@@ -447,6 +728,182 @@ export default function Products() {
                 </Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={purchaseModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {isTr ? 'TedarikÃ§iden Mal Al' : 'Record Supplier Purchase'}
+              </Text>
+              <TouchableOpacity onPress={() => setPurchaseModalVisible(false)}>
+                <X size={24} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={[styles.form, { paddingBottom: modalBottomSpacing }]}
+              keyboardShouldPersistTaps="handled"
+            >
+              <TouchableOpacity
+                style={[styles.pickerButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+                onPress={() => setShowSupplierPicker(true)}
+              >
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.entities.supplier}</Text>
+                <Text style={[styles.pickerValue, { color: theme.colors.text }]}>{selectedPurchaseSupplierName}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.pickerButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+                onPress={() => setShowProductPicker(true)}
+              >
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.common.entities.product}</Text>
+                <Text style={[styles.pickerValue, { color: theme.colors.text }]}>{selectedPurchaseProductName}</Text>
+              </TouchableOpacity>
+
+              <DateField
+                label={t.common.fields.date}
+                value={purchaseData.paymentDate}
+                onChange={(paymentDate) => setPurchaseData((current) => ({ ...current, paymentDate }))}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textMuted}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, styles.halfInputLeft]}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{isTr ? 'Miktar' : 'Quantity'}</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+                    value={purchaseData.quantity}
+                    onChangeText={(quantity) => setPurchaseData((current) => ({ ...current, quantity }))}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={theme.colors.textSoft}
+                  />
+                </View>
+                <View style={[styles.inputGroup, styles.halfInputRight]}>
+                  <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.products.purchasePrice}</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+                    value={purchaseData.unitPrice}
+                    onChangeText={(unitPrice) => setPurchaseData((current) => ({ ...current, unitPrice }))}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    placeholderTextColor={theme.colors.textSoft}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.payments.paymentMethod}</Text>
+                <TouchableOpacity
+                  style={[styles.pickerButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+                  onPress={() =>
+                    Alert.alert(
+                      t.payments.paymentMethod,
+                      isTr ? 'YÃ¶ntem seÃ§in' : 'Select a method',
+                      methodOptions.map((method) => ({
+                        text: method.label,
+                        onPress: () =>
+                          setPurchaseData((current) => ({
+                            ...current,
+                            paymentMethod: method.value,
+                          })),
+                      }))
+                    )
+                  }
+                >
+                  <Text style={[styles.pickerValue, { color: theme.colors.text }]}>{selectedPurchaseMethod}</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: theme.colors.textMuted }]}>{t.payments.description}</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+                  value={purchaseData.description}
+                  onChangeText={(description) => setPurchaseData((current) => ({ ...current, description }))}
+                  placeholder={isTr ? 'AÃ§Ä±klama' : 'Description'}
+                  placeholderTextColor={theme.colors.textSoft}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.submitButton, { backgroundColor: theme.colors.primary }, purchaseSaving && styles.buttonDisabled]}
+                onPress={handleCreatePurchase}
+                disabled={purchaseSaving}
+              >
+                <Text style={styles.submitButtonText}>
+                  {purchaseSaving ? t.common.saving : isTr ? 'Mal GiriÅŸini Kaydet' : 'Save Purchase Entry'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showSupplierPicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerModalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.common.entities.supplier}</Text>
+              <TouchableOpacity onPress={() => setShowSupplierPicker(false)}>
+                <X size={24} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={suppliers}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
+                  onPress={() => {
+                    setPurchaseData((current) => ({ ...current, supplierId: item.id }));
+                    setShowSupplierPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showProductPicker} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerModalContent, { backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{t.common.entities.product}</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)}>
+                <X size={24} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={products}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.pickerItem, { borderBottomColor: theme.colors.border }]}
+                  onPress={() => {
+                    setPurchaseData((current) => ({
+                      ...current,
+                      productId: item.id,
+                      unitPrice: current.unitPrice || String(item.purchase_price || ''),
+                    }));
+                    setShowProductPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, { color: theme.colors.text }]}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
           </View>
         </View>
       </Modal>
@@ -486,6 +943,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 18,
     elevation: 4,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  secondaryHeaderButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
   },
   addProductIcon: {
     width: 24,
@@ -581,6 +1051,13 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     maxHeight: '90%',
   },
+  pickerModalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    maxHeight: '75%',
+    minHeight: '50%',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -620,6 +1097,25 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
   },
+  pickerButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+  },
+  pickerValue: {
+    ...typography.heading,
+    fontSize: 16,
+  },
+  pickerItem: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  pickerItemText: {
+    ...typography.heading,
+    fontSize: 16,
+  },
   submitButton: {
     borderRadius: 12,
     padding: 16,
@@ -635,3 +1131,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+
