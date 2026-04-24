@@ -21,6 +21,7 @@ interface Company {
   address?: string;
   phone?: string;
   email?: string;
+  subscription_plan?: 'free' | 'pro';
 }
 
 interface CompanyMembership {
@@ -46,6 +47,7 @@ interface AuthContextType {
   companies: CompanyMembership[];
   activeCompanyId: string | null;
   activeRole: CompanyMembership['role'] | null;
+  isProCompany: boolean;
   recentAcceptedCompanies: CompanyMembership[];
   noCompanyAccess: boolean;
   loading: boolean;
@@ -203,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from('user_companies')
       .select(
-        'company_id, role, created_at, companies(id, name, tax_number, address, phone, email)'
+        'company_id, role, created_at, companies(id, name, tax_number, address, phone, email, subscription_plan)'
       )
       .eq('user_id', nextUser.id)
       .order('created_at', { ascending: true });
@@ -489,7 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase
         .from('user_companies')
         .select(
-          'company_id, role, created_at, companies(id, name, tax_number, address, phone, email)'
+          'company_id, role, created_at, companies(id, name, tax_number, address, phone, email, subscription_plan)'
         )
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
@@ -624,6 +626,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         companies,
         activeCompanyId,
         activeRole,
+        isProCompany: company?.subscription_plan === 'pro',
         recentAcceptedCompanies,
         noCompanyAccess,
         loading,

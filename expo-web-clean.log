@@ -1,0 +1,37 @@
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+Networking has been disabled
+Starting project at C:\Users\Win10\Desktop\Firma 360\Firma-360
+Metro is running in CI mode, reloads are disabled. Remove CI=true to enable watch mode.
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 41.9% (23/43)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.6% (111/275)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓░░░░░░░░░ 49.6% (307/459)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 68.7% (600/724)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.4% ( 844/2510)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 70.4% (1504/2518)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94.6% (2460/2529)
+Web Bundled 27032ms node_modules\expo-router\entry.js (2731 modules)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\jspdf\dist\jspdf.es.min.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 356ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web Bundled 3148ms node_modules\jspdf\dist\jspdf.es.min.js (27 modules)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 203ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\jspdf\dist\jspdf.es.min.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 8ms node_modules\jspdf\dist\jspdf.es.min.js (1 module)
+Web Bundled 2ms node_modules\jspdf-autotable\dist\jspdf.plugin.autotable.mjs (1 module)
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 138ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 104ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 94ms node_modules\expo-router\entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console

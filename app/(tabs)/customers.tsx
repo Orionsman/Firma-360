@@ -11,6 +11,7 @@ import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
 import { createLocalId, enqueueOfflineMutation } from '@/lib/offlineWriteQueue';
+import { exportAccountMovementsPdf, exportAccountMovementsXlsx } from '@/lib/reportExport';
 import { typography } from '@/lib/typography';
 
 interface Customer { id: string; name: string; email?: string; phone?: string; address?: string; balance: number; }
@@ -20,7 +21,7 @@ interface BalanceRow { customer_id?: string | null; supplier_id?: string | null;
 interface SaleMovementRow { id: string; sale_date: string; total_amount: number; created_at?: string; sale_items?: { quantity: number; unit_price: number; total_price: number; products?: { name?: string; unit?: string } | null; }[]; }
 
 export default function Customers() {
-  const { company } = useAuth();
+  const { company, isProCompany } = useAuth();
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const modalBottomSpacing = Math.max(insets.bottom, Platform.OS === 'android' ? 34 : 20) + 24;
@@ -308,6 +309,92 @@ export default function Customers() {
     return currentData.filter((item) => [item.name, item.phone, item.email, item.address].filter(Boolean).some((value) => String(value).toLocaleLowerCase('tr-TR').includes(normalizedQuery)));
   }, [currentData, searchQuery]);
   const visibleMovements = useMemo(() => movementFilter === 'all' ? movements : movements.filter((movement) => movement.type === movementFilter), [movementFilter, movements]);
+  const buildMovementExportPayload = () => {
+    if (!selectedRecord) {
+      throw new Error(t.customers.movementsLoadFailed);
+    }
+
+    const exportMovements = movements;
+    const salesTotal = exportMovements
+      .filter((movement) => movement.type === 'sale')
+      .reduce((sum, movement) => sum + Math.abs(Number(movement.amount || 0)), 0);
+    const paymentsTotal = exportMovements
+      .filter((movement) => movement.type === 'payment')
+      .reduce((sum, movement) => sum + Math.abs(Number(movement.amount || 0)), 0);
+    const safeName = selectedRecord.name
+      .toLocaleLowerCase('tr-TR')
+      .replace(/[^a-z0-9\u00c0-\u024f]+/gi, '-')
+      .replace(/^-+|-+$/g, '');
+    const accountTypeLabel =
+      activeTab === 'customers' ? t.common.entities.customer : t.common.entities.supplier;
+
+    return {
+      baseFileName: `cepte-cari-${safeName || 'cari'}-hareketleri`,
+      title:
+        activeTab === 'customers'
+          ? t.customers.exportTitleCustomer
+          : t.customers.exportTitleSupplier,
+      reportSubtitle:
+        activeTab === 'customers'
+          ? t.customers.exportSubtitleCustomer
+          : t.customers.exportSubtitleSupplier,
+      generatedAt: formatAppDate(new Date().toISOString()),
+      companyName: company?.name ?? '-',
+      accountName: selectedRecord.name,
+      accountTypeLabel,
+      currentBalance: Number(selectedRecord.balance || 0),
+      filterLabel: t.customers.filterAllLabel,
+      footerNote: t.customers.reportFooter,
+      summaryRows: [
+        { label: t.customers.currentBalance, value: Number(selectedRecord.balance || 0) },
+        { label: t.customers.totalMovements, value: String(exportMovements.length) },
+        { label: t.customers.totalSales, value: salesTotal },
+        { label: t.customers.totalPayments, value: paymentsTotal },
+      ],
+      movementRows: exportMovements.map((movement) => ({
+        date: formatAppDate(movement.date),
+        type: movement.type === 'sale' ? t.common.entities.sale : t.common.entities.payment,
+        title: movement.title,
+        subtitle: movement.subtitle,
+        amount: Number(movement.amount || 0),
+        runningBalance: Number(movement.runningBalance || 0),
+      })),
+    };
+  };
+
+  const ensureProExportAccess = () => {
+    if (!isProCompany) {
+      Alert.alert(t.customers.exportProRequiredTitle, t.customers.exportProRequiredText);
+      return false;
+    }
+
+    if (!selectedRecord || movements.length === 0) {
+      Alert.alert(t.common.info, t.customers.noMovementsForFilter);
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleExportPdf = async () => {
+    if (!ensureProExportAccess()) return;
+
+    try {
+      await exportAccountMovementsPdf(buildMovementExportPayload());
+    } catch (error: unknown) {
+      Alert.alert(t.common.error, error instanceof Error ? error.message : t.customers.exportFailed);
+    }
+  };
+
+  const handleExportXlsx = async () => {
+    if (!ensureProExportAccess()) return;
+
+    try {
+      await exportAccountMovementsXlsx(buildMovementExportPayload());
+    } catch (error: unknown) {
+      Alert.alert(t.common.error, error instanceof Error ? error.message : t.customers.exportFailed);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -421,6 +508,14 @@ export default function Customers() {
             </View>
             <ScrollView contentContainerStyle={styles.detailList}>
               <View style={styles.filterRow}>{[{ key: 'all', label: t.customers.all }, { key: 'sale', label: t.common.entities.sales }, { key: 'payment', label: t.common.entities.payments }].map((item) => { const isActive = movementFilter === item.key; return <TouchableOpacity key={item.key} style={[styles.filterChip, { backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted, borderColor: isActive ? theme.colors.primary : theme.colors.border }]} onPress={() => setMovementFilter(item.key as 'all' | 'sale' | 'payment')}><Text style={[styles.filterChipText, { color: isActive ? theme.colors.primary : theme.colors.textMuted }]}>{item.label}</Text></TouchableOpacity>; })}</View>
+              <View style={styles.exportRow}>
+                <TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]} onPress={() => void handleExportPdf()}>
+                  <Text style={[styles.exportButtonText, { color: theme.colors.primaryStrong }]}>{t.customers.exportPdf}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]} onPress={() => void handleExportXlsx()}>
+                  <Text style={[styles.exportButtonText, { color: theme.colors.text }]}>{t.customers.exportXlsx}</Text>
+                </TouchableOpacity>
+              </View>
               {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.amount >= 0 ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.amount)}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
             </ScrollView>
           </View>
@@ -473,6 +568,9 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
   filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   filterChipText: { ...typography.label, fontSize: 13 },
+  exportRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  exportButton: { flex: 1, borderWidth: 1, borderRadius: 14, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  exportButtonText: { ...typography.heading, fontSize: 14 },
   movementItem: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   movementTextGroup: { flex: 1 },
   movementTitle: { ...typography.heading, fontSize: 15, marginBottom: 4 },
