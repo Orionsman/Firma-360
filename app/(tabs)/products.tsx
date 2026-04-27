@@ -228,7 +228,12 @@ export default function Products() {
 
       resetProductForm();
       setModalVisible(false);
-      Alert.alert(t.common.error, t.locale() === 'tr' ? 'BaÄŸlantÄ± yok. ÃœrÃ¼n cihazda saklandÄ± ve sonra senkronlanacak.' : 'No connection. The product was saved on this device and will sync later.');
+      Alert.alert(
+        t.common.error,
+        t.locale() === 'tr'
+          ? 'Ba�lant� yok. �r�n cihazda sakland� ve sonra senkronlanacak.'
+          : 'No connection. The product was saved on this device and will sync later.'
+      );
     } finally {
       setSaving(false);
     }
@@ -258,8 +263,8 @@ export default function Products() {
   const methodOptions = [
     { value: 'cash', label: isTr ? 'Nakit' : 'Cash' },
     { value: 'bank_transfer', label: isTr ? 'Banka transferi' : 'Bank transfer' },
-    { value: 'credit_card', label: isTr ? 'Kredi kartÄ±' : 'Credit card' },
-    { value: 'check', label: isTr ? 'Ã‡ek' : 'Check' },
+    { value: 'credit_card', label: isTr ? 'Kredi kart�' : 'Credit card' },
+    { value: 'check', label: isTr ? '�ek' : 'Check' },
   ];
 
   const selectedPurchaseMethod =
@@ -428,7 +433,7 @@ export default function Products() {
         companyId: company.id,
         recordId: product.id,
       });
-      Alert.alert(t.common.error, t.locale() === 'tr' ? 'BaÄŸlantÄ± yok. Silme iÅŸlemi sÄ±raya alÄ±ndÄ±.' : 'No connection. Delete was queued.');
+      Alert.alert(t.common.error, t.locale() === 'tr' ? 'Ba�lant� yok. Silme i�lemi s�raya al�nd�.' : 'No connection. Delete was queued.');
     } finally {
       setDeletingId(null);
     }
@@ -564,7 +569,9 @@ export default function Products() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
-              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>{editingProduct ? (isTr ? 'ÃœrÃ¼nÃ¼ DÃ¼zenle' : 'Edit Product') : t.products.newProduct}</Text>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
+                {editingProduct ? (isTr ? '�r�n� D�zenle' : 'Edit Product') : t.products.newProduct}
+              </Text>
               <TouchableOpacity onPress={() => { setModalVisible(false); resetProductForm(); }}>
                 <X size={24} color={theme.colors.textMuted} />
               </TouchableOpacity>
@@ -737,7 +744,7 @@ export default function Products() {
           <View style={[styles.modalContent, { backgroundColor: theme.colors.surface }]}>
             <View style={[styles.modalHeader, { borderBottomColor: theme.colors.border }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                {isTr ? 'TedarikÃ§iden Mal Al' : 'Record Supplier Purchase'}
+                {isTr ? 'Tedarik�iden Mal Al' : 'Record Supplier Purchase'}
               </Text>
               <TouchableOpacity onPress={() => setPurchaseModalVisible(false)}>
                 <X size={24} color={theme.colors.textMuted} />
@@ -807,7 +814,7 @@ export default function Products() {
                   onPress={() =>
                     Alert.alert(
                       t.payments.paymentMethod,
-                      isTr ? 'YÃ¶ntem seÃ§in' : 'Select a method',
+                      isTr ? 'Y�ntem se�in' : 'Select a method',
                       methodOptions.map((method) => ({
                         text: method.label,
                         onPress: () =>
@@ -829,7 +836,7 @@ export default function Products() {
                   style={[styles.input, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
                   value={purchaseData.description}
                   onChangeText={(description) => setPurchaseData((current) => ({ ...current, description }))}
-                  placeholder={isTr ? 'AÃ§Ä±klama' : 'Description'}
+                  placeholder={isTr ? 'A��klama' : 'Description'}
                   placeholderTextColor={theme.colors.textSoft}
                 />
               </View>
@@ -840,7 +847,7 @@ export default function Products() {
                 disabled={purchaseSaving}
               >
                 <Text style={styles.submitButtonText}>
-                  {purchaseSaving ? t.common.saving : isTr ? 'Mal GiriÅŸini Kaydet' : 'Save Purchase Entry'}
+                  {purchaseSaving ? t.common.saving : isTr ? 'Mal Giri�ini Kaydet' : 'Save Purchase Entry'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1131,5 +1138,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+
+
+
+
 
 

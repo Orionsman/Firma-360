@@ -8,7 +8,7 @@ export const dictionaries = {
 
 export type Locale = keyof typeof dictionaries;
 export type TranslationKey = string;
-export type TranslationValue<K extends TranslationKey> = string;
+export type TranslationValue = string;
 
 let currentLocale: Locale = 'tr';
 
@@ -23,14 +23,14 @@ export const getDictionary = (locale: Locale = currentLocale) => dictionaries[lo
 const resolvePath = <K extends TranslationKey>(
   source: TranslationSchema,
   key: K
-): TranslationValue<K> => {
+): TranslationValue => {
   return key.split('.').reduce((value, part) => {
     return (value as Record<string, unknown>)[part];
-  }, source as unknown) as TranslationValue<K>;
+  }, source as unknown) as TranslationValue;
 };
 
 type Translator = TranslationSchema & {
-  <K extends TranslationKey>(key: K): TranslationValue<K>;
+  <K extends TranslationKey>(key: K): TranslationValue;
   locale: () => Locale;
   setLocale: (locale: Locale) => void;
   dictionary: (locale?: Locale) => TranslationSchema;
@@ -41,7 +41,7 @@ const translatorTarget = Object.assign(
     K extends TranslationKey,
   >(
     key: K
-  ) => TranslationValue<K>,
+  ) => TranslationValue,
   {
     locale: getLocale,
     setLocale,

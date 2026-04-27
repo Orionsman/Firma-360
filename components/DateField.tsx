@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { createElement, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -11,6 +11,7 @@ type DateFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
   textColor: string;
   mutedColor: string;
   backgroundColor: string;
@@ -38,6 +39,7 @@ export function DateField({
   label,
   value,
   onChange,
+  placeholder,
   textColor,
   mutedColor,
   backgroundColor,
@@ -45,6 +47,7 @@ export function DateField({
   accentColor,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false);
+  const webInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedDate = useMemo(() => parseDate(value), [value]);
 
@@ -60,6 +63,63 @@ export function DateField({
     onChange(formatDate(nextDate));
   };
 
+  const openWebPicker = () => {
+    const input = webInputRef.current;
+    if (!input) return;
+
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+
+    input.focus();
+    input.click();
+  };
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.group}>
+        <Text style={[styles.label, { color: mutedColor }]}>{label}</Text>
+        <TouchableOpacity
+          style={[
+            styles.trigger,
+            {
+              backgroundColor,
+              borderColor,
+              position: 'relative',
+            },
+          ]}
+          onPress={openWebPicker}
+          activeOpacity={0.85}
+        >
+          {createElement('input', {
+            ref: (node: HTMLInputElement | null) => {
+              webInputRef.current = node;
+            },
+            type: 'date',
+            value,
+            onChange: (event: Event) => {
+              const target = event.target as HTMLInputElement | null;
+              onChange(target?.value || '');
+            },
+            style: {
+              position: 'absolute',
+              inset: 0,
+              opacity: 0,
+              width: '100%',
+              height: '100%',
+              cursor: 'pointer',
+            },
+          })}
+          <Text style={[styles.value, { color: value ? textColor : mutedColor }]}>
+            {value ? formatAppDate(selectedDate) : (placeholder || label)}
+          </Text>
+          <CalendarDays size={18} color={accentColor} />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.group}>
       <Text style={[styles.label, { color: mutedColor }]}>{label}</Text>
@@ -74,8 +134,8 @@ export function DateField({
         onPress={() => setOpen(true)}
         activeOpacity={0.85}
       >
-        <Text style={[styles.value, { color: textColor }]}>
-          {formatAppDate(selectedDate)}
+        <Text style={[styles.value, { color: value ? textColor : mutedColor }]}>
+          {value ? formatAppDate(selectedDate) : (placeholder || label)}
         </Text>
         <CalendarDays size={18} color={accentColor} />
       </TouchableOpacity>

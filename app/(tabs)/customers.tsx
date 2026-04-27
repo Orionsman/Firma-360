@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, ListRenderItem, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { UserPlus, X, User, TrendingUp, TrendingDown, Trash2 } from 'lucide-react-native';
+import { Alert, FlatList, ListRenderItem, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { UserPlus, X, User, TrendingUp, TrendingDown, Trash2, Share2, SlidersHorizontal } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { DateField } from '@/components/DateField';
 import { formatAppDate, formatSignedTRY, formatTRY } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { readOfflineCache, writeOfflineCache } from '@/lib/offlineCache';
@@ -36,6 +37,11 @@ export default function Customers() {
   const [selectedRecord, setSelectedRecord] = useState<Customer | Supplier | null>(null);
   const [movements, setMovements] = useState<AccountMovement[]>([]);
   const [movementFilter, setMovementFilter] = useState<'all' | 'sale' | 'payment'>('all');
+  const [movementSearchQuery, setMovementSearchQuery] = useState('');
+  const [movementDateFrom, setMovementDateFrom] = useState('');
+  const [movementDateTo, setMovementDateTo] = useState('');
+  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
+  const [exportMenuVisible, setExportMenuVisible] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', address: '' });
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -193,6 +199,9 @@ export default function Customers() {
       setSelectedRecord(record);
       setMovements(nextMovements);
       setMovementFilter('all');
+      setMovementSearchQuery('');
+      setMovementDateFrom('');
+      setMovementDateTo('');
       setDetailVisible(true);
     } catch (error: unknown) {
       Alert.alert(t.common.error, error instanceof Error ? error.message : t.customers.movementsLoadFailed);
@@ -308,13 +317,27 @@ export default function Customers() {
     if (!normalizedQuery) return currentData;
     return currentData.filter((item) => [item.name, item.phone, item.email, item.address].filter(Boolean).some((value) => String(value).toLocaleLowerCase('tr-TR').includes(normalizedQuery)));
   }, [currentData, searchQuery]);
-  const visibleMovements = useMemo(() => movementFilter === 'all' ? movements : movements.filter((movement) => movement.type === movementFilter), [movementFilter, movements]);
+  const visibleMovements = useMemo(() => {
+    const normalizedQuery = movementSearchQuery.trim().toLocaleLowerCase('tr-TR');
+    return movements.filter((movement) => {
+      const typeMatch = movementFilter === 'all' ? true : movement.type === movementFilter;
+      const dateMatch =
+        (!movementDateFrom || movement.date >= movementDateFrom) &&
+        (!movementDateTo || movement.date <= movementDateTo);
+      const searchMatch =
+        !normalizedQuery ||
+        [movement.title, movement.subtitle, movement.date]
+          .filter(Boolean)
+          .some((value) => String(value).toLocaleLowerCase('tr-TR').includes(normalizedQuery));
+      return typeMatch && dateMatch && searchMatch;
+    });
+  }, [movementDateFrom, movementDateTo, movementFilter, movementSearchQuery, movements]);
   const buildMovementExportPayload = () => {
     if (!selectedRecord) {
       throw new Error(t.customers.movementsLoadFailed);
     }
 
-    const exportMovements = movements;
+    const exportMovements = visibleMovements;
     const salesTotal = exportMovements
       .filter((movement) => movement.type === 'sale')
       .reduce((sum, movement) => sum + Math.abs(Number(movement.amount || 0)), 0);
@@ -327,6 +350,20 @@ export default function Customers() {
       .replace(/^-+|-+$/g, '');
     const accountTypeLabel =
       activeTab === 'customers' ? t.common.entities.customer : t.common.entities.supplier;
+    const filterLabels = [
+      movementFilter === 'all'
+        ? (t.locale() === 'tr' ? 'Tum Hareketler' : 'All Movements')
+        : movementFilter === 'sale'
+          ? t.common.entities.sales
+          : t.common.entities.payments,
+      movementDateFrom ? `${t.locale() === 'tr' ? 'Baslangic' : 'From'}: ${formatAppDate(movementDateFrom)}` : null,
+      movementDateTo ? `${t.locale() === 'tr' ? 'Bitis' : 'To'}: ${formatAppDate(movementDateTo)}` : null,
+      movementSearchQuery.trim()
+        ? `${t.locale() === 'tr' ? 'Arama' : 'Search'}: ${movementSearchQuery.trim()}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' • ');
 
     return {
       baseFileName: `cepte-cari-${safeName || 'cari'}-hareketleri`,
@@ -343,7 +380,7 @@ export default function Customers() {
       accountName: selectedRecord.name,
       accountTypeLabel,
       currentBalance: Number(selectedRecord.balance || 0),
-      filterLabel: t.customers.filterAllLabel,
+      filterLabel: filterLabels || t.customers.filterAllLabel,
       footerNote: t.customers.reportFooter,
       summaryRows: [
         { label: t.customers.currentBalance, value: Number(selectedRecord.balance || 0) },
@@ -368,7 +405,7 @@ export default function Customers() {
       return false;
     }
 
-    if (!selectedRecord || movements.length === 0) {
+    if (!selectedRecord || visibleMovements.length === 0) {
       Alert.alert(t.common.info, t.customers.noMovementsForFilter);
       return false;
     }
@@ -377,6 +414,7 @@ export default function Customers() {
   };
 
   const handleExportPdf = async () => {
+    setExportMenuVisible(false);
     if (!ensureProExportAccess()) return;
 
     try {
@@ -387,6 +425,7 @@ export default function Customers() {
   };
 
   const handleExportXlsx = async () => {
+    setExportMenuVisible(false);
     if (!ensureProExportAccess()) return;
 
     try {
@@ -506,20 +545,151 @@ export default function Customers() {
               <View><Text style={[styles.modalTitle, { color: theme.colors.text }]}>{selectedRecord?.name}</Text><Text style={[styles.detailBalance, { color: theme.colors.textMuted }]}>{t.common.entities.balance}: {formatSignedTRY(Number(selectedRecord?.balance || 0))}</Text></View>
               <TouchableOpacity onPress={() => setDetailVisible(false)}><X size={24} color={theme.colors.textMuted} /></TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={styles.detailList}>
-              <View style={styles.filterRow}>{[{ key: 'all', label: t.customers.all }, { key: 'sale', label: t.common.entities.sales }, { key: 'payment', label: t.common.entities.payments }].map((item) => { const isActive = movementFilter === item.key; return <TouchableOpacity key={item.key} style={[styles.filterChip, { backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted, borderColor: isActive ? theme.colors.primary : theme.colors.border }]} onPress={() => setMovementFilter(item.key as 'all' | 'sale' | 'payment')}><Text style={[styles.filterChipText, { color: isActive ? theme.colors.primary : theme.colors.textMuted }]}>{item.label}</Text></TouchableOpacity>; })}</View>
-              <View style={styles.exportRow}>
-                <TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]} onPress={() => void handleExportPdf()}>
-                  <Text style={[styles.exportButtonText, { color: theme.colors.primaryStrong }]}>{t.customers.exportPdf}</Text>
+            <ScrollView
+              style={styles.detailScroll}
+              contentContainerStyle={styles.detailList}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.filterRow}>
+                <TouchableOpacity
+                  style={[styles.shareButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+                  onPress={() => setFilterMenuVisible(true)}
+                >
+                  <SlidersHorizontal size={16} color={theme.colors.text} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.exportButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]} onPress={() => void handleExportXlsx()}>
-                  <Text style={[styles.exportButtonText, { color: theme.colors.text }]}>{t.customers.exportXlsx}</Text>
-                </TouchableOpacity>
+                <View style={styles.shareActionWrap}>
+                  <TouchableOpacity
+                    style={[styles.shareButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+                    onPress={() => setExportMenuVisible(true)}
+                  >
+                    <Share2 size={16} color={theme.colors.text} />
+                  </TouchableOpacity>
+                  <View style={[styles.proBadge, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                </View>
               </View>
+              <Text style={[styles.filterSummaryText, { color: theme.colors.textMuted }]}>
+                {[
+                  movementFilter === 'all'
+                    ? (t.locale() === 'tr' ? 'Tum Hareketler' : 'All Movements')
+                    : movementFilter === 'sale'
+                      ? t.common.entities.sales
+                      : t.common.entities.payments,
+                  movementDateFrom ? `${t.locale() === 'tr' ? 'Baslangic' : 'From'} ${formatAppDate(movementDateFrom)}` : null,
+                  movementDateTo ? `${t.locale() === 'tr' ? 'Bitis' : 'To'} ${formatAppDate(movementDateTo)}` : null,
+                  movementSearchQuery.trim() ? `${t.locale() === 'tr' ? 'Arama' : 'Search'}: ${movementSearchQuery.trim()}` : null,
+                ].filter(Boolean).join(' • ')}
+              </Text>
               {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.amount >= 0 ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.amount)}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
             </ScrollView>
           </View>
         </View>
+      </Modal>
+      <Modal visible={filterMenuVisible} transparent animationType="fade" onRequestClose={() => setFilterMenuVisible(false)}>
+        <Pressable style={styles.exportMenuBackdrop} onPress={() => setFilterMenuVisible(false)}>
+          <Pressable
+            style={[styles.exportMenuCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.exportMenuTitle, { color: theme.colors.text }]}>
+              {t.locale() === 'tr' ? 'Filtrele' : 'Filter'}
+            </Text>
+            <View style={styles.filterModalChipRow}>
+              {[{ key: 'all', label: t.customers.all }, { key: 'sale', label: t.common.entities.sales }, { key: 'payment', label: t.common.entities.payments }].map((item) => {
+                const isActive = movementFilter === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    style={[
+                      styles.filterChip,
+                      {
+                        backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surfaceMuted,
+                        borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                      },
+                    ]}
+                    onPress={() => setMovementFilter(item.key as 'all' | 'sale' | 'payment')}
+                  >
+                    <Text style={[styles.filterChipText, { color: isActive ? theme.colors.primary : theme.colors.textMuted }]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TextInput
+              style={[styles.filterInput, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border, color: theme.colors.text }]}
+              placeholder={t.locale() === 'tr' ? 'Hareketlerde ara' : 'Search movements'}
+              placeholderTextColor={theme.colors.textSoft}
+              value={movementSearchQuery}
+              onChangeText={setMovementSearchQuery}
+            />
+            <View style={styles.filterDateColumn}>
+              <DateField
+                label={t.locale() === 'tr' ? 'Baþlangýç Tarihi' : 'Start Date'}
+                placeholder={t.locale() === 'tr' ? 'Baþlangýç tarihi seç' : 'Select start date'}
+                value={movementDateFrom}
+                onChange={setMovementDateFrom}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textSoft}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
+              <DateField
+                label={t.locale() === 'tr' ? 'Bitiþ Tarihi' : 'End Date'}
+                placeholder={t.locale() === 'tr' ? 'Bitiþ tarihi seç' : 'Select end date'}
+                value={movementDateTo}
+                onChange={setMovementDateTo}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textSoft}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.exportMenuOption, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+              onPress={() => {
+                setMovementFilter('all');
+                setMovementSearchQuery('');
+                setMovementDateFrom('');
+                setMovementDateTo('');
+              }}
+            >
+              <Text style={[styles.exportMenuOptionText, { color: theme.colors.text }]}>
+                {t.locale() === 'tr' ? 'Filtreleri Temizle' : 'Clear Filters'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.exportMenuOption, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]}
+              onPress={() => setFilterMenuVisible(false)}
+            >
+              <Text style={[styles.exportMenuOptionText, { color: theme.colors.primaryStrong }]}>
+                {t.locale() === 'tr' ? 'Uygula' : 'Apply'}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal visible={exportMenuVisible} transparent animationType="fade" onRequestClose={() => setExportMenuVisible(false)}>
+        <Pressable style={styles.exportMenuBackdrop} onPress={() => setExportMenuVisible(false)}>
+          <Pressable
+            style={[styles.exportMenuCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.exportMenuTitle, { color: theme.colors.text }]}>
+              {activeTab === 'customers' ? t.customers.exportTitleCustomer : t.customers.exportTitleSupplier}
+            </Text>
+            <TouchableOpacity style={[styles.exportMenuOption, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]} onPress={() => void handleExportPdf()}>
+              <Text style={[styles.exportMenuOptionText, { color: theme.colors.primaryStrong }]}>{t.customers.exportPdf}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.exportMenuOption, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]} onPress={() => void handleExportXlsx()}>
+              <Text style={[styles.exportMenuOptionText, { color: theme.colors.text }]}>{t.customers.exportXlsx}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
     </View>
   );
@@ -552,7 +722,7 @@ const styles = StyleSheet.create({
   emptyText: { ...typography.body, fontSize: 16, color: '#94a3b8', marginTop: 16, textAlign: 'center', lineHeight: 23 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '90%' },
-  detailContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '85%', minHeight: '55%' },
+  detailContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '85%', minHeight: '55%', overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 24, paddingBottom: 18, borderBottomWidth: 1 },
   modalTitle: { ...typography.title, fontSize: 20 },
   detailBalance: { ...typography.body, fontSize: 14, marginTop: 4 },
@@ -564,13 +734,24 @@ const styles = StyleSheet.create({
   submitButton: { borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.6 },
   submitButtonText: { ...typography.heading, color: '#ffffff', fontSize: 16 },
-  detailList: { paddingHorizontal: 24, paddingBottom: 24 },
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap' },
+  detailScroll: { flex: 1 },
+  detailList: { paddingHorizontal: 24, paddingBottom: 24, flexGrow: 1 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap', paddingTop: 6 },
+  filterSummaryText: { ...typography.caption, fontSize: 12, marginBottom: 16, lineHeight: 18 },
+  filterModalChipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   filterChipText: { ...typography.label, fontSize: 13 },
-  exportRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  exportButton: { flex: 1, borderWidth: 1, borderRadius: 14, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  exportButtonText: { ...typography.heading, fontSize: 14 },
+  filterInput: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14 },
+  filterDateColumn: { gap: 2 },
+  shareActionWrap: { position: 'relative', paddingTop: 4, paddingRight: 4 },
+  shareButton: { width: 38, height: 38, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  proBadge: { position: 'absolute', top: -2, right: -2, borderRadius: 999, paddingHorizontal: 6, paddingVertical: 2, minWidth: 30, alignItems: 'center', justifyContent: 'center' },
+  proBadgeText: { ...typography.label, color: '#ffffff', fontSize: 9 },
+  exportMenuBackdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.36)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  exportMenuCard: { width: '100%', maxWidth: 320, borderWidth: 1, borderRadius: 22, padding: 18, gap: 10 },
+  exportMenuTitle: { ...typography.heading, fontSize: 18, marginBottom: 4 },
+  exportMenuOption: { borderWidth: 1, borderRadius: 14, paddingVertical: 13, alignItems: 'center', justifyContent: 'center' },
+  exportMenuOptionText: { ...typography.heading, fontSize: 14 },
   movementItem: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   movementTextGroup: { flex: 1 },
   movementTitle: { ...typography.heading, fontSize: 15, marginBottom: 4 },
@@ -579,3 +760,5 @@ const styles = StyleSheet.create({
   movementRight: { alignItems: 'flex-end', minWidth: 116, gap: 6 },
   movementBalanceValue: { ...typography.caption, fontSize: 12 },
 });
+
+

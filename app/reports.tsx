@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Modal,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { ArrowLeft, Download, FileSpreadsheet, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { ArrowLeft, Share2, SlidersHorizontal, TrendingDown, TrendingUp } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { BrandHeroHeader } from '@/components/BrandHeroHeader';
+import { DateField } from '@/components/DateField';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { formatAppDate, formatTRY } from '@/lib/format';
@@ -71,16 +75,49 @@ type ReminderRow = {
   amount?: number | null;
 };
 
+type ReportMovementRow = {
+  id: string;
+  date: string;
+  accountName: string;
+  movementLabel: string;
+  amount: number;
+};
+
+type AccountOption = {
+  id: string;
+  name: string;
+  type: 'customer' | 'supplier';
+};
+
 function monthLabel(date: Date) {
   return date.toLocaleDateString('tr-TR', { month: 'short' });
 }
 
-function buildMonthWindow(monthCount: number) {
+function buildMonthWindowFromDates(dates: string[]) {
   const months: { key: string; label: string }[] = [];
-  const now = new Date();
+  const normalizedDates = dates
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
 
-  for (let offset = monthCount - 1; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  if (!normalizedDates.length) {
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return [{ key, label: monthLabel(now) }];
+  }
+
+  const start = new Date(normalizedDates[0].getFullYear(), normalizedDates[0].getMonth(), 1);
+  const end = new Date(
+    normalizedDates[normalizedDates.length - 1].getFullYear(),
+    normalizedDates[normalizedDates.length - 1].getMonth(),
+    1
+  );
+
+  for (
+    let date = new Date(start);
+    date <= end;
+    date = new Date(date.getFullYear(), date.getMonth() + 1, 1)
+  ) {
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     months.push({ key, label: monthLabel(date) });
   }
@@ -116,7 +153,17 @@ export default function ReportsScreen() {
   const { theme } = useAppTheme();
   const isTr = t.locale() === 'tr';
   const [refreshing, setRefreshing] = useState(false);
-  const [monthCount, setMonthCount] = useState<3 | 6 | 12>(6);
+  const [filterVisible, setFilterVisible] = useState(false);
+  const [exportMenuVisible, setExportMenuVisible] = useState(false);
+  const [movementTypeMenuVisible, setMovementTypeMenuVisible] = useState(false);
+  const [accountFieldFocused, setAccountFieldFocused] = useState(false);
+  const [accountSearchInput, setAccountSearchInput] = useState('');
+  const [reportDateFrom, setReportDateFrom] = useState('');
+  const [reportDateTo, setReportDateTo] = useState('');
+  const [reportSearchQuery, setReportSearchQuery] = useState('');
+  const [reportMovementType, setReportMovementType] = useState<'all' | 'sale' | 'payment' | 'collection'>('all');
+  const [accountOptions, setAccountOptions] = useState<AccountOption[]>([]);
+  const [reportMovements, setReportMovements] = useState<ReportMovementRow[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyChartDatum[]>([]);
   const [receivables, setReceivables] = useState(0);
   const [payables, setPayables] = useState(0);
@@ -178,12 +225,45 @@ export default function ReportsScreen() {
       );
     }
 
-    const sales = (salesResult.data as SaleRow[]) ?? [];
-    const payments = (paymentsResult.data as PaymentRow[]) ?? [];
     const customers = (customersResult.data as CustomerRow[]) ?? [];
     const suppliers = (suppliersResult.data as SupplierRow[]) ?? [];
     const reminders = (remindersResult.data as ReminderRow[]) ?? [];
-    const monthWindow = buildMonthWindow(monthCount);
+    setAccountOptions([
+      ...customers.map((customer) => ({ id: customer.id, name: customer.name, type: 'customer' as const })),
+      ...suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name, type: 'supplier' as const })),
+    ]);
+    const customerNameById = new Map(customers.map((customer) => [customer.id, customer.name]));
+    const supplierNameById = new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
+    const normalizedSearch = reportSearchQuery.trim().toLocaleLowerCase('tr-TR');
+    const saleMatchesType = reportMovementType === 'all' || reportMovementType === 'sale';
+    const incomeMatchesType = reportMovementType === 'all' || reportMovementType === 'collection';
+    const expenseMatchesType = reportMovementType === 'all' || reportMovementType === 'payment';
+    const isWithinRange = (dateValue: string) =>
+      (!reportDateFrom || dateValue >= reportDateFrom) && (!reportDateTo || dateValue <= reportDateTo);
+    const matchesSearch = (value: string | null | undefined) =>
+      !normalizedSearch || String(value || '').toLocaleLowerCase('tr-TR').includes(normalizedSearch);
+    const sales = ((salesResult.data as SaleRow[]) ?? []).filter((sale) => {
+      const customerName = sale.customer_id ? customerNameById.get(sale.customer_id) : sale.customers?.name;
+      return saleMatchesType && isWithinRange(sale.sale_date) && matchesSearch(customerName);
+    });
+    const payments = ((paymentsResult.data as PaymentRow[]) ?? []).filter((payment) => {
+      const accountName =
+        payment.payment_type === 'income'
+          ? (payment.customer_id ? customerNameById.get(payment.customer_id) : '')
+          : (payment.supplier_id ? supplierNameById.get(payment.supplier_id) : '');
+      const matchesType =
+        (payment.payment_type === 'income' && incomeMatchesType) ||
+        (payment.payment_type === 'expense' && expenseMatchesType);
+      return matchesType && isWithinRange(payment.payment_date) && matchesSearch(accountName);
+    });
+    const filteredReminderDates = reminders
+      .map((reminder) => reminder.due_date)
+      .filter((date) => isWithinRange(date));
+    const monthWindow = buildMonthWindowFromDates([
+      ...sales.map((sale) => sale.sale_date),
+      ...payments.map((payment) => payment.payment_date),
+      ...filteredReminderDates,
+    ]);
     const monthMap = new Map(
       monthWindow.map((month) => [
         month.key,
@@ -260,9 +340,36 @@ export default function ReportsScreen() {
     }));
 
     const today = new Date().toISOString().split('T')[0];
-    const pendingReminders = reminders.filter((reminder) => reminder.status === 'pending');
+    const pendingReminders = reminders.filter(
+      (reminder) => reminder.status === 'pending' && isWithinRange(reminder.due_date)
+    );
+    const nextReportMovements: ReportMovementRow[] = [
+      ...sales.map((sale) => ({
+        id: `sale-${sale.customer_id || sale.sale_date}-${sale.total_amount || 0}`,
+        date: sale.sale_date,
+        accountName:
+          (sale.customer_id ? customerNameById.get(sale.customer_id) : sale.customers?.name) ||
+          (isTr ? 'Müşteri' : 'Customer'),
+        movementLabel: isTr ? 'Satış' : 'Sale',
+        amount: Number(sale.total_amount || 0),
+      })),
+      ...payments.map((payment) => ({
+        id: `payment-${payment.customer_id || payment.supplier_id || payment.payment_date}-${payment.amount || 0}-${payment.payment_type}`,
+        date: payment.payment_date,
+        accountName:
+          payment.payment_type === 'income'
+            ? ((payment.customer_id ? customerNameById.get(payment.customer_id) : '') || (isTr ? 'Müşteri' : 'Customer'))
+            : ((payment.supplier_id ? supplierNameById.get(payment.supplier_id) : '') || (isTr ? 'Tedarikçi' : 'Supplier')),
+        movementLabel:
+          payment.payment_type === 'income'
+            ? (isTr ? 'Tahsilat' : 'Collection')
+            : (isTr ? 'Ödeme' : 'Payment'),
+        amount: Number(payment.amount || 0) * (payment.payment_type === 'income' ? 1 : -1),
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     setMonthlyData(Array.from(monthMap.values()));
+    setReportMovements(nextReportMovements);
     setReceivables(customerBalances.reduce((sum, item) => sum + Math.max(item.value, 0), 0));
     setPayables(supplierBalances.reduce((sum, item) => sum + Math.max(item.value, 0), 0));
     setCashFlow(
@@ -299,7 +406,7 @@ export default function ReportsScreen() {
         .filter((reminder) => reminder.due_date <= today)
         .reduce((sum, reminder) => sum + Number(reminder.amount || 0), 0)
     );
-  }, [company, isTr, monthCount]);
+  }, [company, isTr, reportDateFrom, reportDateTo, reportMovementType, reportSearchQuery]);
 
   useEffect(() => {
     void fetchReportData().catch((error: unknown) => {
@@ -352,7 +459,20 @@ export default function ReportsScreen() {
         ? 'Bu rapor CepteCari uygulamasi tarafindan duzenlenmistir.'
         : 'This report was generated by the CepteCari application.',
       title: isTr ? 'CepteCari Finansal Rapor' : 'CepteCari Financial Report',
-      periodLabel: isTr ? `Periyot: Son ${monthCount} ay` : `Period: Last ${monthCount} months`,
+      periodLabel: [
+        reportMovementType === 'all'
+          ? (isTr ? 'Hareket: Tümü' : 'Movement: All')
+          : reportMovementType === 'sale'
+            ? (isTr ? 'Hareket: Satışlar' : 'Movement: Sales')
+            : reportMovementType === 'payment'
+              ? (isTr ? 'Hareket: Ödemeler' : 'Movement: Payments')
+              : (isTr ? 'Hareket: Tahsilatlar' : 'Movement: Collections'),
+        reportDateFrom ? `${isTr ? 'Başlangıç' : 'From'}: ${formatAppDate(reportDateFrom)}` : null,
+        reportDateTo ? `${isTr ? 'Bitiş' : 'To'}: ${formatAppDate(reportDateTo)}` : null,
+        reportSearchQuery.trim() ? `${isTr ? 'Cari' : 'Account'}: ${reportSearchQuery.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join(' • '),
       monthlyRows: monthlyData.map((item) => ({
         month: item.label,
         sales: item.sales,
@@ -367,11 +487,25 @@ export default function ReportsScreen() {
         { label: isTr ? 'Geciken Tahsilat Tutari' : 'Overdue Collection Amount', value: overdueAmount },
       ],
     }),
-    [averageSale, cashFlow, company?.name, isTr, monthCount, monthlyData, overdueAmount, payables, receivables]
+    [
+      averageSale,
+      cashFlow,
+      company?.name,
+      isTr,
+      monthlyData,
+      overdueAmount,
+      payables,
+      receivables,
+      reportDateFrom,
+      reportDateTo,
+      reportMovementType,
+      reportSearchQuery,
+    ]
   );
 
 
   const handleExportPdf = async () => {
+    setExportMenuVisible(false);
     try {
       await exportReportPdf(exportPayload);
     } catch (error: unknown) {
@@ -383,6 +517,7 @@ export default function ReportsScreen() {
   };
 
   const handleExportXlsx = async () => {
+    setExportMenuVisible(false);
     try {
       await exportReportXlsx(exportPayload);
     } catch (error: unknown) {
@@ -399,6 +534,12 @@ export default function ReportsScreen() {
     { label: isTr ? 'Net Nakit Akışı' : 'Net Cash Flow', value: formatTRY(cashFlow), tone: cashFlow >= 0 ? theme.colors.success : theme.colors.danger },
     { label: isTr ? 'Ortalama Satış' : 'Average Sale', value: formatTRY(averageSale), tone: theme.colors.primary },
   ];
+  const visibleAccountOptions = useMemo(() => {
+    const normalized = reportSearchQuery.trim().toLocaleLowerCase('tr-TR');
+    return accountOptions
+      .filter((item) => !normalized || item.name.toLocaleLowerCase('tr-TR').includes(normalized))
+      .slice(0, 8);
+  }, [accountOptions, reportSearchQuery]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -422,39 +563,33 @@ export default function ReportsScreen() {
         />
 
         <View style={styles.chipRow}>
-          {[3, 6, 12].map((count) => {
-            const active = monthCount === count;
-            return (
-              <TouchableOpacity
-                key={count}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: active ? theme.colors.primarySoft : theme.colors.surface,
-                    borderColor: active ? theme.colors.primary : theme.colors.border,
-                  },
-                ]}
-                onPress={() => setMonthCount(count as 3 | 6 | 12)}
-              >
-                <Text style={[styles.filterChipText, { color: active ? theme.colors.primary : theme.colors.textMuted }]}>
-                  {isTr ? `Son ${count} ay` : `Last ${count} months`}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            onPress={() => void handleExportXlsx()}
+            onPress={() => setFilterVisible(true)}
           >
-            <FileSpreadsheet size={18} color={theme.colors.primary} />
+            <SlidersHorizontal size={18} color={theme.colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.iconButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-            onPress={() => void handleExportPdf()}
+            onPress={() => setExportMenuVisible(true)}
           >
-            <Download size={18} color={theme.colors.primary} />
+            <Share2 size={18} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
+        <Text style={[styles.filterSummaryText, { color: theme.colors.textMuted }]}>
+          {[
+            reportMovementType === 'all'
+              ? (isTr ? 'Tüm hareketler' : 'All movements')
+              : reportMovementType === 'sale'
+                ? (isTr ? 'Satışlar' : 'Sales')
+                : reportMovementType === 'payment'
+                  ? (isTr ? 'Ödemeler' : 'Payments')
+                  : (isTr ? 'Tahsilatlar' : 'Collections'),
+            reportDateFrom ? `${isTr ? 'Başlangıç' : 'From'} ${formatAppDate(reportDateFrom)}` : null,
+            reportDateTo ? `${isTr ? 'Bitiş' : 'To'} ${formatAppDate(reportDateTo)}` : null,
+            reportSearchQuery.trim() ? `${isTr ? 'Cari' : 'Account'}: ${reportSearchQuery.trim()}` : null,
+          ].filter(Boolean).join(' • ')}
+        </Text>
 
         <View style={styles.kpiGrid}>
           {kpiCards.map((card) => (
@@ -637,7 +772,211 @@ export default function ReportsScreen() {
             </View>
           ))}
         </View>
+
+        <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+          <Text style={[styles.cardTitle, { color: theme.colors.text }]}>
+            {isTr ? 'Cari Hareketleri' : 'Account Movements'}
+          </Text>
+          {reportMovements.length === 0 ? (
+            <Text style={[styles.emptyMovementText, { color: theme.colors.textMuted }]}>
+              {isTr ? 'Bu filtre için hareket bulunamadı.' : 'No movements found for this filter.'}
+            </Text>
+          ) : reportMovements.map((movement) => (
+            <View key={movement.id} style={[styles.reportMovementItem, { borderBottomColor: theme.colors.border }]}>
+              <View style={styles.reportMovementText}>
+                <Text style={[styles.reportMovementTitle, { color: theme.colors.text }]}>{movement.accountName}</Text>
+                <Text style={[styles.reportMovementMeta, { color: theme.colors.textMuted }]}>
+                  {movement.movementLabel} • {formatAppDate(movement.date)}
+                </Text>
+              </View>
+              <Text style={[styles.reportMovementAmount, { color: movement.amount >= 0 ? theme.colors.success : theme.colors.danger }]}>
+                {formatTRY(Math.abs(movement.amount))}
+              </Text>
+            </View>
+          ))}
+        </View>
       </ScrollView>
+      <Modal visible={filterVisible} transparent animationType="fade" onRequestClose={() => setFilterVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setFilterVisible(false)}>
+          <Pressable
+            style={[styles.filterModalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.filterModalTitle, { color: theme.colors.text }]}>
+              {isTr ? 'Rapor Filtresi' : 'Report Filter'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.selectTrigger, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+              onPress={() => setMovementTypeMenuVisible((current) => !current)}
+            >
+              <Text style={[styles.selectTriggerText, { color: theme.colors.text }]}>
+                {reportMovementType === 'all'
+                  ? (isTr ? 'Tümü' : 'All')
+                  : reportMovementType === 'sale'
+                    ? (isTr ? 'Satış' : 'Sale')
+                    : reportMovementType === 'payment'
+                      ? (isTr ? 'Ödemeler' : 'Payments')
+                      : (isTr ? 'Tahsilat' : 'Collections')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.selectTrigger, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+              onPress={() => {
+                setAccountSearchInput('');
+                setAccountFieldFocused((current) => !current);
+              }}
+            >
+              <Text style={[styles.selectTriggerText, { color: reportSearchQuery ? theme.colors.text : theme.colors.textMuted }]}>
+                {reportSearchQuery || (isTr ? 'Cari seçiniz' : 'Select account')}
+              </Text>
+            </TouchableOpacity>
+            {accountFieldFocused ? (
+              <View style={[styles.selectMenu, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
+                <TextInput
+                  style={[styles.filterInput, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, color: theme.colors.text, marginHorizontal: 8, marginBottom: 8 }]}
+                  placeholder={isTr ? 'Cari arayınız' : 'Search account'}
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={accountSearchInput}
+                  onChangeText={setAccountSearchInput}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={styles.selectOption}
+                  onPress={() => {
+                    setReportSearchQuery('');
+                    setAccountSearchInput('');
+                    setAccountFieldFocused(false);
+                  }}
+                >
+                  <Text style={[styles.selectOptionText, { color: theme.colors.text }]}>
+                    {isTr ? 'Tüm cariler' : 'All accounts'}
+                  </Text>
+                </TouchableOpacity>
+                {visibleAccountOptions.length ? visibleAccountOptions.map((item) => (
+                  <TouchableOpacity
+                    key={`${item.type}-${item.id}`}
+                    style={styles.selectOption}
+                    onPress={() => {
+                      setReportSearchQuery(item.name);
+                      setAccountSearchInput('');
+                      setAccountFieldFocused(false);
+                    }}
+                  >
+                    <Text style={[styles.selectOptionText, { color: theme.colors.text }]}>{item.name}</Text>
+                  </TouchableOpacity>
+                )) : (
+                  <Text style={[styles.emptyOptionText, { color: theme.colors.textMuted }]}>
+                    {isTr ? 'Liste yok.' : 'No accounts found.'}
+                  </Text>
+                )}
+              </View>
+            ) : null}
+            <View style={styles.dateFieldColumn}>
+              <DateField
+                label={isTr ? 'Başlangıç Tarihi' : 'Start Date'}
+                placeholder={isTr ? 'Başlangıç tarihi seç' : 'Select start date'}
+                value={reportDateFrom}
+                onChange={setReportDateFrom}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textMuted}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
+              <DateField
+                label={isTr ? 'Bitiş Tarihi' : 'End Date'}
+                placeholder={isTr ? 'Bitiş tarihi seç' : 'Select end date'}
+                value={reportDateTo}
+                onChange={setReportDateTo}
+                textColor={theme.colors.text}
+                mutedColor={theme.colors.textMuted}
+                backgroundColor={theme.colors.surfaceMuted}
+                borderColor={theme.colors.border}
+                accentColor={theme.colors.primary}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+              onPress={() => {
+                setReportDateFrom('');
+                setReportDateTo('');
+                setReportSearchQuery('');
+                setAccountFieldFocused(false);
+                setReportMovementType('all');
+              }}
+            >
+              <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>
+                {isTr ? 'Filtreleri Temizle' : 'Clear Filters'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]}
+              onPress={() => setFilterVisible(false)}
+            >
+              <Text style={[styles.modalButtonText, { color: theme.colors.primary }]}>
+                {isTr ? 'Uygula' : 'Apply'}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal visible={movementTypeMenuVisible} transparent animationType="fade" onRequestClose={() => setMovementTypeMenuVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setMovementTypeMenuVisible(false)}>
+          <Pressable
+            style={[styles.selectionModalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.selectionModalTitle, { color: theme.colors.text }]}>
+              {isTr ? 'Cari Hareket Türü' : 'Movement Type'}
+            </Text>
+            {[
+              { key: 'all', label: isTr ? 'Tümü' : 'All' },
+              { key: 'sale', label: isTr ? 'Satış' : 'Sale' },
+              { key: 'payment', label: isTr ? 'Ödemeler' : 'Payments' },
+              { key: 'collection', label: isTr ? 'Tahsilat' : 'Collections' },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.selectionOption, { borderBottomColor: theme.colors.border }]}
+                onPress={() => {
+                  setReportMovementType(item.key as 'all' | 'sale' | 'payment' | 'collection');
+                  setMovementTypeMenuVisible(false);
+                }}
+              >
+                <Text style={[styles.selectionOptionText, { color: theme.colors.text }]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal visible={exportMenuVisible} transparent animationType="fade" onRequestClose={() => setExportMenuVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setExportMenuVisible(false)}>
+          <Pressable
+            style={[styles.filterModalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+            onPress={(event) => event.stopPropagation()}
+          >
+            <Text style={[styles.filterModalTitle, { color: theme.colors.text }]}>
+              {isTr ? 'Raporu Dışa Aktar' : 'Export Report'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary }]}
+              onPress={() => void handleExportPdf()}
+            >
+              <Text style={[styles.modalButtonText, { color: theme.colors.primary }]}>
+                {isTr ? 'PDF Al' : 'Export PDF'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
+              onPress={() => void handleExportXlsx()}
+            >
+              <Text style={[styles.modalButtonText, { color: theme.colors.text }]}>
+                {isTr ? 'Excel Al' : 'Export Excel'}
+              </Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -678,6 +1017,131 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  filterSummaryText: {
+    ...typography.caption,
+    marginHorizontal: 16,
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15,23,42,0.36)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  filterModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 18,
+    gap: 12,
+  },
+  filterModalTitle: {
+    ...typography.title,
+    fontSize: 18,
+  },
+  filterOptionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  selectTrigger: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    justifyContent: 'center',
+  },
+  selectTriggerText: {
+    ...typography.body,
+    fontSize: 14,
+  },
+  filterInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+  },
+  selectMenu: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 6,
+  },
+  selectOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  selectOptionText: {
+    ...typography.body,
+    fontSize: 14,
+  },
+  emptyOptionText: {
+    ...typography.caption,
+    fontSize: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  selectionModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 8,
+    overflow: 'hidden',
+  },
+  selectionModalTitle: {
+    ...typography.heading,
+    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+  },
+  selectionOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  selectionOptionText: {
+    ...typography.body,
+    fontSize: 14,
+  },
+  dateFieldColumn: {
+    gap: 2,
+  },
+  modalButton: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    ...typography.heading,
+    fontSize: 14,
+  },
+  accountSuggestionWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  accountSuggestionChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accountSuggestionText: {
+    ...typography.label,
+    fontSize: 12,
+  },
+  emptyMovementText: {
+    ...typography.body,
+    fontSize: 14,
   },
   kpiGrid: {
     marginHorizontal: 16,
@@ -842,5 +1306,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
+  },
+  reportMovementItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  reportMovementText: {
+    flex: 1,
+  },
+  reportMovementTitle: {
+    ...typography.heading,
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  reportMovementMeta: {
+    ...typography.caption,
+    fontSize: 12,
+  },
+  reportMovementAmount: {
+    ...typography.heading,
+    fontSize: 14,
   },
 });

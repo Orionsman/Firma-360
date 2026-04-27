@@ -26,7 +26,6 @@ function AppNavigator() {
         <Stack.Screen name="reset-password" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="reports" />
-        <Stack.Screen name="business-tools" />
         <Stack.Screen name="pro-companies" />
         <Stack.Screen name="pro-team" />
         <Stack.Screen name="pro-reminders" />

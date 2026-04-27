@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
@@ -139,6 +139,25 @@ const downloadOnWeb = (fileName: string, content: BlobPart, mimeType: string) =>
   URL.revokeObjectURL(url);
 };
 
+const openPdfBlobOnWeb = (fileName: string, blob: Blob) => {
+  const documentRef = (globalThis as { document?: Document }).document;
+  const windowRef = (globalThis as { window?: Window }).window;
+
+  if (!documentRef || !windowRef) {
+    throw new Error('Web PDF onizleme ortami bulunamadi.');
+  }
+
+  const url = URL.createObjectURL(blob);
+  const openedWindow = windowRef.open(url, '_blank', 'noopener,noreferrer');
+
+  if (!openedWindow) {
+    downloadOnWeb(fileName, blob, 'application/pdf');
+    return;
+  }
+
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};
+
 const waitForNextFrame = () =>
   new Promise<void>((resolve) => {
     const requestFrame = (globalThis as { requestAnimationFrame?: (callback: () => void) => number })
@@ -152,7 +171,11 @@ const waitForNextFrame = () =>
     setTimeout(resolve, 0);
   });
 
-const exportHtmlCanvasPdfOnWeb = async (fileName: string, html: string) => {
+const exportHtmlCanvasPdfOnWeb = async (
+  fileName: string,
+  html: string,
+  mode: 'download' | 'preview' = 'download'
+) => {
   const documentRef = (globalThis as { document?: Document }).document;
 
   if (!documentRef?.body) {
@@ -216,21 +239,58 @@ const exportHtmlCanvasPdfOnWeb = async (fileName: string, html: string) => {
     const imageHeight = (canvas.height * pageWidth) / canvas.width;
     let offsetY = 0;
     let remainingHeight = imageHeight;
+    const pageTolerance = 1;
 
     doc.addImage(imageData, 'PNG', 0, offsetY, pageWidth, imageHeight);
     remainingHeight -= pageHeight;
 
-    while (remainingHeight > 0) {
+    while (remainingHeight > pageTolerance) {
       offsetY -= pageHeight;
       doc.addPage();
       doc.addImage(imageData, 'PNG', 0, offsetY, pageWidth, imageHeight);
       remainingHeight -= pageHeight;
     }
 
-    downloadOnWeb(fileName, doc.output('blob'), 'application/pdf');
+    const blob = doc.output('blob');
+    if (mode === 'preview') {
+      openPdfBlobOnWeb(fileName, blob);
+      return;
+    }
+
+    downloadOnWeb(fileName, blob, 'application/pdf');
   } finally {
     container.remove();
   }
+};
+
+const openPdfPreviewNative = async (uri: string, fileName: string) => {
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystem.getContentUriAsync(uri);
+    try {
+      await Linking.openURL(contentUri);
+      return;
+    } catch {
+      // Fall through to other preview/share strategies.
+    }
+  }
+
+  try {
+    await Linking.openURL(uri);
+    return;
+  } catch {
+    // Fall through to share sheet as last resort.
+  }
+
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/pdf',
+      dialogTitle: fileName,
+      UTI: 'com.adobe.pdf',
+    });
+    return;
+  }
+
+  throw new Error('PDF onizlemesi bu cihazda kullanilamiyor.');
 };
 
 const loadImageAsDataUrl = async (uri: string) => {
@@ -934,7 +994,7 @@ export const exportAccountMovementsPdf = async (payload: AccountMovementReportPa
 
   if (Platform.OS === 'web') {
     try {
-      await exportHtmlCanvasPdfOnWeb(fileName, buildAccountMovementHtml(payload));
+      await exportHtmlCanvasPdfOnWeb(fileName, buildAccountMovementHtml(payload), 'preview');
       return;
     } catch {
       // Fall back to direct jsPDF drawing if browser canvas rendering is unavailable.
@@ -1036,19 +1096,10 @@ export const exportAccountMovementsPdf = async (payload: AccountMovementReportPa
       maxWidth: pageWidth - 80,
     });
 
-    downloadOnWeb(fileName, doc.output('blob'), 'application/pdf');
+    openPdfBlobOnWeb(fileName, doc.output('blob'));
     return;
   }
 
   const { uri } = await Print.printToFileAsync({ html: buildAccountMovementHtml(payload) });
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: fileName,
-      UTI: 'com.adobe.pdf',
-    });
-    return;
-  }
-
-  throw new Error('PDF paylasimi bu cihazda kullanilamiyor.');
+  await openPdfPreviewNative(uri, fileName);
 };
