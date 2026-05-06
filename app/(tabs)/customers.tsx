@@ -352,18 +352,18 @@ export default function Customers() {
       activeTab === 'customers' ? t.common.entities.customer : t.common.entities.supplier;
     const filterLabels = [
       movementFilter === 'all'
-        ? (t.locale() === 'tr' ? 'Tum Hareketler' : 'All Movements')
+        ? (t.locale() === 'tr' ? 'Tüm Hareketler' : 'All Movements')
         : movementFilter === 'sale'
           ? t.common.entities.sales
           : t.common.entities.payments,
-      movementDateFrom ? `${t.locale() === 'tr' ? 'Baslangic' : 'From'}: ${formatAppDate(movementDateFrom)}` : null,
-      movementDateTo ? `${t.locale() === 'tr' ? 'Bitis' : 'To'}: ${formatAppDate(movementDateTo)}` : null,
+      movementDateFrom ? `${t.locale() === 'tr' ? 'Başlangıç' : 'From'}: ${formatAppDate(movementDateFrom)}` : null,
+      movementDateTo ? `${t.locale() === 'tr' ? 'Bitiş' : 'To'}: ${formatAppDate(movementDateTo)}` : null,
       movementSearchQuery.trim()
         ? `${t.locale() === 'tr' ? 'Arama' : 'Search'}: ${movementSearchQuery.trim()}`
         : null,
     ]
       .filter(Boolean)
-      .join(' � ');
+      .join(' • ');
 
     return {
       baseFileName: `cepte-cari-${safeName || 'cari'}-hareketleri`,
@@ -549,7 +549,7 @@ export default function Customers() {
               style={styles.detailScroll}
               contentContainerStyle={styles.detailList}
               nestedScrollEnabled
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator
             >
               <View style={styles.filterRow}>
                 <TouchableOpacity
@@ -573,15 +573,25 @@ export default function Customers() {
               <Text style={[styles.filterSummaryText, { color: theme.colors.textMuted }]}>
                 {[
                   movementFilter === 'all'
-                    ? (t.locale() === 'tr' ? 'Tum Hareketler' : 'All Movements')
+                    ? (t.locale() === 'tr' ? 'Tüm Hareketler' : 'All Movements')
                     : movementFilter === 'sale'
                       ? t.common.entities.sales
                       : t.common.entities.payments,
-                  movementDateFrom ? `${t.locale() === 'tr' ? 'Baslangic' : 'From'} ${formatAppDate(movementDateFrom)}` : null,
-                  movementDateTo ? `${t.locale() === 'tr' ? 'Bitis' : 'To'} ${formatAppDate(movementDateTo)}` : null,
+                  movementDateFrom ? `${t.locale() === 'tr' ? 'Başlangıç' : 'From'} ${formatAppDate(movementDateFrom)}` : null,
+                  movementDateTo ? `${t.locale() === 'tr' ? 'Bitiş' : 'To'} ${formatAppDate(movementDateTo)}` : null,
                   movementSearchQuery.trim() ? `${t.locale() === 'tr' ? 'Arama' : 'Search'}: ${movementSearchQuery.trim()}` : null,
-                ].filter(Boolean).join(' � ')}
+                ].filter(Boolean).join(' • ')}
               </Text>
+              <View style={styles.movementHeaderRow}>
+                <Text style={[styles.movementSectionTitle, { color: theme.colors.text }]}>
+                  {t.locale() === 'tr' ? 'Hareketler (' + visibleMovements.length + ')' : 'Movements (' + visibleMovements.length + ')'}
+                </Text>
+                {visibleMovements.length > 2 ? (
+                  <Text style={[styles.movementScrollHint, { color: theme.colors.textSoft }]}> 
+                    {t.locale() === 'tr' ? 'Devamı için kaydır' : 'Scroll for more'}
+                  </Text>
+                ) : null}
+              </View>
               {visibleMovements.length === 0 ? <View style={styles.detailEmptyState}><Text style={[styles.emptyText, { color: theme.colors.textSoft }]}>{t.customers.noMovementsForFilter}</Text></View> : visibleMovements.map((movement) => <View key={movement.id} style={[styles.movementItem, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}><View style={styles.movementTextGroup}><Text style={[styles.movementTitle, { color: theme.colors.text }]}>{movement.title}</Text><Text style={[styles.movementSubtitle, { color: theme.colors.textMuted }]}>{movement.subtitle} - {formatAppDate(movement.date)}</Text></View><View style={styles.movementRight}><Text style={[styles.movementAmount, movement.amount >= 0 ? styles.balancePositive : styles.balanceNegative]}>{formatSignedTRY(movement.amount)}</Text><Text style={[styles.movementBalanceValue, { color: (movement.runningBalance || 0) >= 0 ? theme.colors.success : theme.colors.danger }]}>{t.common.entities.balance}: {formatSignedTRY(movement.runningBalance || 0)}</Text></View></View>)}
             </ScrollView>
           </View>
@@ -627,8 +637,8 @@ export default function Customers() {
             />
             <View style={styles.filterDateColumn}>
               <DateField
-                label={t.locale() === 'tr' ? 'Ba�lang�� Tarihi' : 'Start Date'}
-                placeholder={t.locale() === 'tr' ? 'Ba�lang�� tarihi se�' : 'Select start date'}
+                label={t.locale() === 'tr' ? 'Başlangıç Tarihi' : 'Start Date'}
+                placeholder={t.locale() === 'tr' ? 'Başlangıç tarihi seç' : 'Select start date'}
                 value={movementDateFrom}
                 onChange={setMovementDateFrom}
                 textColor={theme.colors.text}
@@ -638,8 +648,8 @@ export default function Customers() {
                 accentColor={theme.colors.primary}
               />
               <DateField
-                label={t.locale() === 'tr' ? 'Biti� Tarihi' : 'End Date'}
-                placeholder={t.locale() === 'tr' ? 'Biti� tarihi se�' : 'Select end date'}
+                label={t.locale() === 'tr' ? 'Bitiş Tarihi' : 'End Date'}
+                placeholder={t.locale() === 'tr' ? 'Bitiş tarihi seç' : 'Select end date'}
                 value={movementDateTo}
                 onChange={setMovementDateTo}
                 textColor={theme.colors.text}
@@ -722,7 +732,7 @@ const styles = StyleSheet.create({
   emptyText: { ...typography.body, fontSize: 16, color: '#94a3b8', marginTop: 16, textAlign: 'center', lineHeight: 23 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '90%' },
-  detailContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '85%', minHeight: '55%', overflow: 'hidden' },
+  detailContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 24, maxHeight: '90%', minHeight: '68%', overflow: 'hidden' },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 24, paddingBottom: 18, borderBottomWidth: 1 },
   modalTitle: { ...typography.title, fontSize: 20 },
   detailBalance: { ...typography.body, fontSize: 14, marginTop: 4 },
@@ -738,6 +748,9 @@ const styles = StyleSheet.create({
   detailList: { paddingHorizontal: 24, paddingBottom: 24, flexGrow: 1 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 16, flexWrap: 'wrap', paddingTop: 6 },
   filterSummaryText: { ...typography.caption, fontSize: 12, marginBottom: 16, lineHeight: 18 },
+  movementHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12 },
+  movementSectionTitle: { ...typography.heading, fontSize: 15 },
+  movementScrollHint: { ...typography.caption, fontSize: 11 },
   filterModalChipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
   filterChipText: { ...typography.label, fontSize: 13 },
@@ -760,5 +773,7 @@ const styles = StyleSheet.create({
   movementRight: { alignItems: 'flex-end', minWidth: 116, gap: 6 },
   movementBalanceValue: { ...typography.caption, fontSize: 12 },
 });
+
+
 
 

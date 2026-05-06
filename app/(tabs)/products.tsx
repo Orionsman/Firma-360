@@ -275,7 +275,7 @@ export default function Products() {
     if (!purchaseData.supplierId || !purchaseData.productId) {
       Alert.alert(
         t.common.error,
-        isTr ? 'TedarikÃ§i ve Ã¼rÃ¼n seÃ§in.' : 'Select a supplier and product.'
+        isTr ? 'Tedarikçi ve ürün seçin.' : 'Select a supplier and product.'
       );
       return;
     }
@@ -1138,6 +1138,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
 
 
 

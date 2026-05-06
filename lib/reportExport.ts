@@ -1,5 +1,6 @@
-import { Linking, Platform } from 'react-native';
+﻿import { Linking, Platform } from 'react-native';
 import { Asset } from 'expo-asset';
+import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -85,19 +86,19 @@ const tr = {
 
 const sanitizeExportText = (value: string | number | null | undefined) =>
   String(value ?? '')
-    .replace(/Ä°/g, 'İ')
-    .replace(/Ä±/g, 'ı')
-    .replace(/Å/g, 'Ş')
-    .replace(/ÅŸ/g, 'ş')
-    .replace(/Ä/g, 'Ğ')
-    .replace(/ÄŸ/g, 'ğ')
-    .replace(/Ãœ/g, 'Ü')
-    .replace(/Ã¼/g, 'ü')
-    .replace(/Ã–/g, 'Ö')
-    .replace(/Ã¶/g, 'ö')
-    .replace(/Ã‡/g, 'Ç')
-    .replace(/Ã§/g, 'ç')
-    .replace(/â‚º/g, '₺');
+    .replace(/Ã„Â°/g, 'İ')
+    .replace(/Ã„Â±/g, 'ı')
+    .replace(/Ã…Â/g, 'Ş')
+    .replace(/Ã…Å¸/g, 'ş')
+    .replace(/Ã„Â/g, 'Ğ')
+    .replace(/Ã„Å¸/g, 'ğ')
+    .replace(/ÃƒÅ“/g, 'Ü')
+    .replace(/ÃƒÂ¼/g, 'ü')
+    .replace(/Ãƒâ€“/g, 'Ö')
+    .replace(/ÃƒÂ¶/g, 'ö')
+    .replace(/Ãƒâ€¡/g, 'Ç')
+    .replace(/ÃƒÂ§/g, 'ç')
+    .replace(/Ã¢â€šÂº/g, '₺');
 
 const formatExportCurrency = (value: number | string) => {
   const amount = Number(value || 0);
@@ -267,7 +268,11 @@ const openPdfPreviewNative = async (uri: string, fileName: string) => {
   if (Platform.OS === 'android') {
     const contentUri = await FileSystem.getContentUriAsync(uri);
     try {
-      await Linking.openURL(contentUri);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        type: 'application/pdf',
+        flags: 1,
+      });
       return;
     } catch {
       // Fall through to other preview/share strategies.
@@ -977,16 +982,7 @@ export const exportReportPdf = async (payload: StructuredReportPayload) => {
   }
 
   const { uri } = await Print.printToFileAsync({ html: buildNativeHtml(payload) });
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: fileName,
-      UTI: 'com.adobe.pdf',
-    });
-    return;
-  }
-
-  throw new Error('PDF paylasimi bu cihazda kullanilamiyor.');
+  await openPdfPreviewNative(uri, fileName);
 };
 
 export const exportAccountMovementsPdf = async (payload: AccountMovementReportPayload) => {
@@ -1103,3 +1099,4 @@ export const exportAccountMovementsPdf = async (payload: AccountMovementReportPa
   const { uri } = await Print.printToFileAsync({ html: buildAccountMovementHtml(payload) });
   await openPdfPreviewNative(uri, fileName);
 };
+
